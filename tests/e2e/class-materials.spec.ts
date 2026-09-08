@@ -234,6 +234,33 @@ test.describe("a class's notes and documents", () => {
     expect(patch?.body).toMatchObject({ title: "Grade 9 Physics syllabus — revised" });
   });
 
+  test("opening a note centres it in a dialog that closes on Escape or the backdrop", async ({
+    page,
+  }) => {
+    await teacher(page);
+    await page.goto(`/classes/${CLASS_ID}/notes`);
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Unit 1: Forces and Motion")).toBeVisible();
+
+    // Centred, not a strip down one edge: the gap either side is even.
+    const box = (await dialog.boundingBox())!;
+    const viewport = page.viewportSize()!;
+    const leftGap = box.x;
+    const rightGap = viewport.width - (box.x + box.width);
+    expect(Math.abs(leftGap - rightGap)).toBeLessThan(2);
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+
+    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await expect(dialog).toBeVisible();
+    await page.mouse.click(4, 4);
+    await expect(dialog).toBeHidden();
+  });
+
   test("deleting a note asks first, then calls the backend that owns its files", async ({ page }) => {
     const written = await teacher(page);
     await page.goto(`/classes/${CLASS_ID}/notes`);

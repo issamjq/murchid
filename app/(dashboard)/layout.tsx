@@ -2,7 +2,7 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { RequireOnboardedTeacher } from "@/features/auth/require-onboarded-teacher";
 import { ClassesRefreshProvider } from "@/features/classes/classes-refresh-context";
 import { StudioProvider } from "@/features/studio-legacy/studio-context";
-import { StudioPanel } from "@/features/studio-legacy/StudioPanel";
+import { StudioDialog } from "@/features/studio-legacy/StudioDialog";
 import { AnalyticsTracker } from "@/features/analytics/analytics-tracker";
 
 export default function DashboardLayout({
@@ -17,7 +17,7 @@ export default function DashboardLayout({
         <ClassesRefreshProvider>
           <StudioProvider>
             <DashboardShell>{children}</DashboardShell>
-            <StudioPanel />
+            <StudioDialog />
           </StudioProvider>
         </ClassesRefreshProvider>
       </RequireOnboardedTeacher>
