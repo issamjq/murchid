@@ -1,0 +1,138 @@
+name: Add empty commit
+
+# Pushes an empty commit so a git-connected host (Vercel, Netlify, Render, ...)
+# redeploys.
+#
+# WHY: those hosts ship only on a push webhook. When a deploy needs re-running
+# without a code change — a rebuilt cache, a new env var, a build that failed on
+# a flake — an empty commit is the smallest thing that produces one.
+#
+# GITHUB_TOKEN pushes deliberately do NOT re-trigger GitHub Actions, so this can
+# never loop on itself. The host's GitHub App still sees the push webhook, which
+# is the whole point.
+#
+# COMMIT AUTHOR — the one thing that makes deploys actually work. Vercel rejects
+# a deploy when the git author is not a member of the project ("Git author X
+# must have access to the project"), so the author has to be an account with
+# access. First non-empty wins:
+#   1. the `author` input, typed at run time
+#   2. repo variable DEPLOY_COMMIT_AUTHOR
+#   3. whoever clicked "Run workflow" (needs no configuration at all)
+# Set the variable only when the deploying account differs from the people
+# running this:
+#   gh variable set DEPLOY_COMMIT_AUTHOR --body 'login <ID+login@users.noreply.github.com>'
+# See SETUP.md for how to find the numeric id.
+#
+# If the target branch is protected, this stops working: swap the token line for
+# a fine-grained PAT secret with Contents: write.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Target branch"
+        required: false
+        type: string
+        default: main
+      message:
+        description: "Commit message"
+        required: false
+        type: string
+        default: "chore: trigger deploy"
+      author:
+        description: 'Commit author, "Name <email>" (blank = DEPLOY_COMMIT_AUTHOR, else you)'
+        required: false
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      branch:
+        required: false
+        type: string
+        default: main
+      message:
+        required: false
+        type: string
+        default: "chore: trigger deploy"
+      author:
+        required: false
+        type: string
+        default: ""
+
+  # NO SCHEDULE, deliberately. This runs only when someone asks for it:
+  # Actions -> "Add empty commit" -> Run workflow, or a `workflow_call` from
+  # another workflow.
+  #
+  # WHY: a daily empty commit is a commit a day of pure noise in `git log` for a
+  # deploy nobody asked for — and it redeploys whatever happens to be sitting on
+  # the branch at the time. A deploy is a decision. Real work pushes to the
+  # branch and the host builds that push; this workflow exists only for the
+  # redeploy that has no code behind it.
+  #
+  # If a daily redeploy is genuinely wanted, add `schedule: - cron: "40 4 * * *"`
+  # here and push it to the default branch — GitHub reads schedules from the
+  # default branch only. The `|| 'default'` fallbacks below are what make a
+  # schedule run work, since the `inputs` context is empty on one.
+
+permissions:
+  contents: write
+
+# Two runs pushing to the same branch race each other; the loser fails on a
+# non-fast-forward. Queue them instead.
+concurrency:
+  group: empty-commit-${{ inputs.branch || 'main' }}
+  cancel-in-progress: false
+
+jobs:
+  add-empty-commit:
+    runs-on: ubuntu-latest
+    name: empty commit -> ${{ inputs.branch || 'main' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || 'main' }}
+          fetch-depth: 1
+          # Checkout persists this token in the remote URL, so the push below
+          # needs no token of its own. Swap in a PAT secret here — and only
+          # here — if the branch ever becomes protected.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Inputs go through env, never straight into the script: an input carrying
+      # a quote or a $( ) would otherwise be executed by the shell.
+      - name: Create empty commit
+        env:
+          # The noreply address is what makes GitHub attribute the commit to a
+          # real account: the numeric prefix is that account's user id, and the
+          # address must match it exactly or the commit shows as an unlinked
+          # name — and the host's membership check then fails.
+          AUTHOR: ${{ inputs.author || vars.DEPLOY_COMMIT_AUTHOR || format('{0} <{1}+{0}@users.noreply.github.com>', github.actor, github.actor_id) }}
+          MESSAGE: "${{ inputs.message || 'chore: trigger deploy' }}"
+        run: |
+          set -euo pipefail
+
+          case "$AUTHOR" in
+            *"<"*">"*) ;;
+            *) echo "::error::author must be \"Name <email>\", got: $AUTHOR"; exit 1 ;;
+          esac
+
+          name=${AUTHOR%% <*}
+          email=${AUTHOR#*<}
+          email=${email%>}
+
+          # Committer as well as author. Setting only --author leaves the bot as
+          # committer, and GitHub then renders "someone authored and
+          # github-actions[bot] committed" instead of one name.
+          git config user.name "$name"
+          git config user.email "$email"
+
+          git commit --allow-empty -m "$MESSAGE"
+          git --no-pager log -1 --pretty='author:    %an <%ae>%ncommitter: %cn <%ce>%nsubject:   %s'
+
+      - name: Push
+        env:
+          BRANCH: ${{ inputs.branch || 'main' }}
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:$BRANCH"
