@@ -60,6 +60,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     ],
   },
   {
+    id: "sub-day-packet",
+    title: "Substitute plan on each class",
+    period: "Completed",
+    status: "done",
+    summary:
+      "A one-click, printable packet for handing a class off to a substitute — no more assembling it by hand across four tabs.",
+    items: [
+      "Roster plus the day's lessons, homework, quizzes, and exams bundled onto one page for any class + date",
+      "Print-isolated view (sidebar and nav disappear in print preview) — the first print-oriented screen in the app",
+      "Second of a 9-item teacher quality-of-life roadmap; the rest are queued up one at a time",
+    ],
+  },
+  {
     id: "full-redesign",
     title: "Full site redesign",
     period: "Target: Sun, 20 Sep 2026",

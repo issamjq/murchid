@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Printer } from "lucide-react";
 
 import { ClassTabs } from "@/components/layout/class-tabs";
 import { Button } from "@/components/ui/button";
@@ -67,10 +67,20 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
     <div className="flex h-full flex-col">
       <div className="shrink-0 px-6 pt-5 md:px-8">
         {backLink}
-        <h1 className="text-xl font-black tracking-tight">
-          Grade {cls.grade.level} · Div {cls.division.label} · {cls.subject}
-        </h1>
-        <p className="text-sm text-muted-foreground">Batch {cls.batch.label}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-black tracking-tight">
+              Grade {cls.grade.level} · Div {cls.division.label} · {cls.subject}
+            </h1>
+            <p className="text-sm text-muted-foreground">Batch {cls.batch.label}</p>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/classes/${classId}/sub-plan`}>
+              <Printer />
+              Sub plan
+            </Link>
+          </Button>
+        </div>
       </div>
       <div className="shrink-0">
         <ClassTabs classId={classId} />

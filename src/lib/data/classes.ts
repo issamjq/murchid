@@ -165,6 +165,78 @@ export async function listGoalItemsByKind(
   return (data ?? []) as GoalItemRow[];
 }
 
+// ── Sub-day packet: everything scheduled for one class on one date ──
+export interface ScheduledItem {
+  id: string;
+  kind: GoalItemKind | "quiz" | "exam";
+  title: string;
+  markdown: string | null;
+}
+
+const SCHEDULED_KIND_ORDER: Record<string, number> = {
+  lesson_plan: 0,
+  slide_deck: 1,
+  activity: 2,
+  homework: 3,
+  note: 4,
+  exam: 5,
+  quiz: 6,
+};
+
+export async function listScheduledForDate(
+  classId: string,
+  date: string,
+): Promise<ScheduledItem[]> {
+  const db = requireClient();
+  const [{ data: goals, error: goalsError }, { data: assessments, error: assessmentsError }] =
+    await Promise.all([
+      db.from("goals").select("id").eq("class_id", classId),
+      db
+        .from("assessments")
+        .select("id, kind, title, content")
+        .eq("class_id", classId)
+        .eq("scheduled_for", date),
+    ]);
+  if (goalsError) throw goalsError;
+  if (assessmentsError) throw assessmentsError;
+
+  const goalIds = (goals ?? []).map((g) => g.id);
+  let goalItems: {
+    id: string;
+    kind: GoalItemKind;
+    title: string;
+    content: { markdown: string } | null;
+  }[] = [];
+  if (goalIds.length > 0) {
+    const { data, error } = await db
+      .from("goal_items")
+      .select("id, kind, title, content")
+      .in("goal_id", goalIds)
+      .eq("scheduled_for", date);
+    if (error) throw error;
+    goalItems = data ?? [];
+  }
+
+  const items: ScheduledItem[] = [
+    ...goalItems.map((i) => ({
+      id: i.id,
+      kind: i.kind as ScheduledItem["kind"],
+      title: i.title,
+      markdown: i.content?.markdown ?? null,
+    })),
+    ...(assessments ?? []).map((a) => ({
+      id: a.id,
+      kind: a.kind as ScheduledItem["kind"],
+      title: a.title,
+      markdown: a.content?.markdown ?? null,
+    })),
+  ];
+  items.sort(
+    (a, b) => (SCHEDULED_KIND_ORDER[a.kind] ?? 99) - (SCHEDULED_KIND_ORDER[b.kind] ?? 99),
+  );
+  return items;
+}
+
 export async function createGoalItemFromPrompt(
   ownerId: string,
   classId: string,
