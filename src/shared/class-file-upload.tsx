@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Paperclip, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   completeUpload,
   deleteUpload,
@@ -33,6 +35,7 @@ export function ClassFileUpload({
   classId,
   disabled = false,
   clearWhenReady = false,
+  actions,
   onUsableChange,
   onAttached,
 }: {
@@ -40,6 +43,8 @@ export function ClassFileUpload({
   disabled?: boolean;
   /** Drop the chip once the file is read, for surfaces that list the material themselves. */
   clearWhenReady?: boolean;
+  /** Sibling source controls, so they sit in one row of peers rather than reading as an afterthought. */
+  actions?: React.ReactNode;
   onUsableChange?: (hasUsable: boolean) => void;
   onAttached?: () => void;
 }) {
@@ -208,24 +213,34 @@ export function ClassFileUpload({
       ))}
 
       {!disabled ? (
-        <label className="flex w-fit cursor-pointer items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
-          <Paperclip className="size-3.5" />
-          Attach a document
-          <span className="font-normal text-muted-foreground/70">
-            PDF, DOCX, TXT, MD or CSV, up to 150 MB
-          </span>
-          <input
-            ref={inputRef}
-            type="file"
-            accept={ACCEPT}
-            multiple
-            className="sr-only"
-            onChange={(e) => {
-              for (const file of Array.from(e.target.files ?? [])) attach(file);
-              if (inputRef.current) inputRef.current.value = "";
-            }}
-          />
-        </label>
+        <>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <label
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "cursor-pointer focus-within:ring-2 focus-within:ring-ring",
+              )}
+            >
+              <Paperclip className="size-3.5" />
+              Attach a document
+              <input
+                ref={inputRef}
+                type="file"
+                accept={ACCEPT}
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  for (const file of Array.from(e.target.files ?? [])) attach(file);
+                  if (inputRef.current) inputRef.current.value = "";
+                }}
+              />
+            </label>
+            {actions}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            PDF, DOCX, TXT, MD or CSV — up to 150 MB. Scans are transcribed automatically.
+          </p>
+        </>
       ) : null}
     </div>
   );

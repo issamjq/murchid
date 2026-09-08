@@ -5,7 +5,7 @@ import { LibraryBig, NotebookPen } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { ChooseFromDeckList } from "@/features/classes/choose-from-deck-panel";
-import { AddOwnReferenceForm } from "./AddOwnReferenceForm";
+import { AddOwnReferenceForm } from "@/shared/add-own-reference-form";
 
 export function ComposerAttachMenu({
   ownerId,

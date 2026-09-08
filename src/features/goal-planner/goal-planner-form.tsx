@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Sparkles, Check, Lock, FileWarning, AlertTriangle } from "lucide-react";
+import { useMemo, useState, useEffect } from "react";
+import { Check, Lock, AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,48 +10,27 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { StatusPill } from "@/components/ui/status-pill";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSession } from "@/features/auth/session-context";
-import { AddOwnReferenceForm } from "@/features/studio-legacy/AddOwnReferenceForm";
-import { ClassFileUpload } from "@/shared/class-file-upload";
 import { BackendError } from "@/lib/data/backend";
-import {
-  listHierarchy,
-  hasReferenceMaterial,
-  type BatchRow,
-} from "@/lib/data/classes";
+import { listHierarchy, type BatchRow } from "@/lib/data/classes";
 import {
   createDraftingGoal,
   recordGoalSources,
   finishGoal,
   insertGoalItem,
   updateGoalItemContent,
-  getLibraryFilters,
-  searchLibrary,
   streamPlan,
   schedulePlan,
   approvePlan,
   commitApproval,
   type GoalRow,
   type GoalItemRow,
-  type LibraryBoard,
-  type LibraryMaterial,
   type PlanStartedData,
   type ScheduleResult,
 } from "@/lib/data/goal-planner";
-
-// A detailed enough prompt counts as grounding on its own, per the
-// concept: "curriculum, or proper detailed prompts, and textbooks or
-// documents, or choose from the materials." Anything real and attached
-// to the class (Notes & text) also counts, checked separately below.
-const MIN_GROUNDED_PROMPT_LENGTH = 40;
+import { PlanIntake, type ClassOption, type GeneratePayload } from "./plan-intake";
 
 type Stage = "intake" | "generating" | "review" | "scheduling" | "approved";
-
-interface ClassOption {
-  id: string;
-  label: string;
-}
 
 function flattenClasses(batches: BatchRow[]): ClassOption[] {
   return batches
@@ -82,131 +61,12 @@ const KIND_LABEL: Record<string, string> = {
   homework: "Homework",
 };
 
-function SharedLibraryPicker({
-  selected,
-  onToggle,
-}: {
-  selected: Set<string>;
-  onToggle: (id: string) => void;
-}) {
-  const [filters, setFilters] = useState<{ boards: LibraryBoard[] } | null>(null);
-  const [board, setBoard] = useState("");
-  const [grade, setGrade] = useState("");
-  const [subject, setSubject] = useState("");
-  const [results, setResults] = useState<LibraryMaterial[] | null>(null);
-  const [total, setTotal] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getLibraryFilters()
-      .then(setFilters)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load the library"));
-  }, []);
-
-  useEffect(() => {
-    searchLibrary({ board: board || undefined, grade: grade || undefined, subject: subject || undefined, limit: 40 })
-      .then((r) => {
-        setResults(r.materials);
-        setTotal(r.total);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Search failed"));
-  }, [board, grade, subject]);
-
-  const boardOptions = filters?.boards ?? [];
-  const activeBoard = boardOptions.find((b) => b.board === board);
-
-  return (
-    <div className="space-y-2 rounded-md border border-border p-3">
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      <div className="flex flex-wrap gap-2">
-        <select
-          value={board}
-          onChange={(e) => {
-            setBoard(e.target.value);
-            setGrade("");
-            setSubject("");
-          }}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm"
-        >
-          <option value="">Any board</option>
-          {boardOptions.map((b) => (
-            <option key={b.board} value={b.board}>
-              {b.board} ({b.count})
-            </option>
-          ))}
-        </select>
-        <select
-          value={grade}
-          onChange={(e) => setGrade(e.target.value)}
-          disabled={!activeBoard}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm disabled:opacity-50"
-        >
-          <option value="">Any grade</option>
-          {(activeBoard?.grades ?? []).map((g) => (
-            <option key={g} value={g}>
-              Grade {g}
-            </option>
-          ))}
-        </select>
-        <select
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          disabled={!activeBoard}
-          className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm disabled:opacity-50"
-        >
-          <option value="">Any subject</option>
-          {(activeBoard?.subjects ?? []).map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {results === null ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
-      ) : results.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No documents match those filters.</p>
-      ) : (
-        <>
-          <div className="max-h-56 space-y-1 overflow-y-auto">
-            {results.map((m) => (
-              <label key={m.id} className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4"
-                  checked={selected.has(m.id)}
-                  onChange={() => onToggle(m.id)}
-                />
-                <span className="min-w-0">
-                  <span className="block truncate">{m.title}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {m.board} · Grade {m.grade_label} · {m.subject} · {m.material_type}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {results.length} of {total} shown
-          </p>
-        </>
-      )}
-    </div>
-  );
-}
-
 export function GoalPlannerForm() {
   const { user } = useSession();
   const approved = user?.status === "active";
 
   const [stage, setStage] = useState<Stage>("intake");
   const [classes, setClasses] = useState<ClassOption[] | null>(null);
-  const [classId, setClassId] = useState<string>("");
-  const [prompt, setPrompt] = useState("");
-  const [hasReference, setHasReference] = useState<boolean | null>(null);
-  const [hasAttachment, setHasAttachment] = useState(false);
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState<Set<string>>(new Set());
 
   const [goal, setGoal] = useState<GoalRow | null>(null);
   const [started, setStarted] = useState<PlanStartedData | null>(null);
@@ -224,49 +84,20 @@ export function GoalPlannerForm() {
   const [scheduleError, setScheduleError] = useState<string | null>(null);
 
   useEffect(() => {
-    listHierarchy().then((data) => {
-      const options = flattenClasses(data);
-      setClasses(options);
-      if (options.length > 0) setClassId(options[0].id);
-    });
+    listHierarchy().then((data) => setClasses(flattenClasses(data)));
   }, []);
 
-  useEffect(() => {
-    if (!classId) {
-      setHasReference(null);
-      return;
-    }
-    hasReferenceMaterial(classId).then(setHasReference);
-  }, [classId]);
-
-  useEffect(() => {
-    setHasAttachment(false);
-  }, [classId]);
-
-  const grounded = hasReference || hasAttachment || prompt.trim().length >= MIN_GROUNDED_PROMPT_LENGTH;
-  const canGenerate = Boolean(classId) && Boolean(user) && grounded && stage === "intake";
-
-  function toggleMaterial(id: string) {
-    setSelectedMaterialIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  async function generate() {
-    if (!canGenerate || !user) return;
+  async function generate({ classId, prompt, source, materialIds }: GeneratePayload) {
+    if (!user) return;
     setStage("generating");
     setGenerationError(null);
     setItems([]);
     setFailedKinds([]);
     setStarted(null);
 
-    const source = selectedMaterialIds.size > 0 ? "library" : "prompt";
     let createdGoal: GoalRow;
     try {
-      createdGoal = await createDraftingGoal(user.id, classId, prompt.trim(), source);
+      createdGoal = await createDraftingGoal(user.id, classId, prompt, source);
       setGoal(createdGoal);
     } catch (e) {
       setGenerationError(e instanceof Error ? e.message : "Could not start the plan");
@@ -278,9 +109,9 @@ export function GoalPlannerForm() {
       await streamPlan(
         {
           classId,
-          prompt: prompt.trim(),
+          prompt,
           source,
-          materialIds: selectedMaterialIds.size > 0 ? Array.from(selectedMaterialIds) : undefined,
+          materialIds: materialIds.length > 0 ? materialIds : undefined,
           goalId: createdGoal.id,
         },
         (event, data) => {
@@ -394,93 +225,12 @@ export function GoalPlannerForm() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>What are we planning?</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="class">Class</Label>
-            {classes === null ? (
-              <p className="text-sm text-muted-foreground">Loading your classes…</p>
-            ) : classes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No classes yet — add one in My Classes first.
-              </p>
-            ) : (
-              <select
-                id="class"
-                value={classId}
-                onChange={(e) => setClassId(e.target.value)}
-                disabled={stage !== "intake"}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-              >
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-
-          <Tabs defaultValue="prompt">
-            <TabsList>
-              <TabsTrigger value="prompt">Prompt</TabsTrigger>
-              <TabsTrigger value="upload">Upload documents</TabsTrigger>
-              <TabsTrigger value="library">Shared library</TabsTrigger>
-            </TabsList>
-            <TabsContent value="prompt" className="space-y-2">
-              <Textarea
-                rows={6}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                disabled={stage !== "intake"}
-                placeholder="e.g. Term 2, Unit 3: Trade routes of the ancient world. Cover the Silk Road, maritime trade, and the spread of ideas. Reference the Grade 10 CBSE Social Studies syllabus."
-              />
-              {classId ? (
-                <ClassFileUpload
-                  key={classId}
-                  classId={classId}
-                  disabled={stage !== "intake"}
-                  onUsableChange={setHasAttachment}
-                />
-              ) : null}
-            </TabsContent>
-            <TabsContent value="upload">
-              {user && classId ? (
-                <AddOwnReferenceForm
-                  ownerId={user.id}
-                  classId={classId}
-                  onAttached={() => setHasReference(true)}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">Choose a class first.</p>
-              )}
-            </TabsContent>
-            <TabsContent value="library">
-              <SharedLibraryPicker selected={selectedMaterialIds} onToggle={toggleMaterial} />
-            </TabsContent>
-          </Tabs>
-
-          {classId && !grounded ? (
-            <div className="flex items-start gap-2 rounded-md border border-dashed border-warning/40 bg-warning/5 p-3">
-              <FileWarning className="size-4 shrink-0 text-warning" />
-              <p className="text-xs text-muted-foreground">
-                This class has no syllabus, curriculum, or reference attached,
-                and the prompt is too thin to draft from reliably. Add a
-                reference in Notes & text, choose from the shared library
-                above, or write more detail here first — otherwise the draft
-                would be guessing.
-              </p>
-            </div>
-          ) : null}
-
-          <Button className="w-full" onClick={generate} disabled={!canGenerate}>
-            <Sparkles /> Generate term plan
-          </Button>
-        </CardContent>
-      </Card>
+      <PlanIntake
+        classes={classes}
+        ownerId={user?.id ?? null}
+        busy={stage !== "intake"}
+        onGenerate={generate}
+      />
 
       <Card>
         <CardHeader>

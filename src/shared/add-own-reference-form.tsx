@@ -13,10 +13,13 @@ export function AddOwnReferenceForm({
   ownerId,
   classId,
   onAttached,
+  showUpload = true,
 }: {
   ownerId: string;
   classId: string;
   onAttached: () => void;
+  /** Off where the surface already offers uploading of its own. */
+  showUpload?: boolean;
 }) {
   const [title, setTitle] = useState("");
   const [bodyMd, setBodyMd] = useState("");
@@ -41,17 +44,16 @@ export function AddOwnReferenceForm({
 
   return (
     <div className="space-y-3">
-      <ClassFileUpload classId={classId} clearWhenReady onAttached={onAttached} />
-      <p className="text-xs text-muted-foreground">
-        Scanned PDFs are transcribed automatically — the file shows up in Notes &amp; text
-        once it&apos;s read.
-      </p>
-
-      <div className="flex items-center gap-2">
-        <Separator className="flex-1" />
-        <span className="text-xs text-muted-foreground">or type it out</span>
-        <Separator className="flex-1" />
-      </div>
+      {showUpload ? (
+        <>
+          <ClassFileUpload classId={classId} clearWhenReady onAttached={onAttached} />
+          <div className="flex items-center gap-2">
+            <Separator className="flex-1" />
+            <span className="text-xs text-muted-foreground">or type it out</span>
+            <Separator className="flex-1" />
+          </div>
+        </>
+      ) : null}
 
       <Input
         placeholder="e.g. Grade 10 Social Studies syllabus — Term 2"

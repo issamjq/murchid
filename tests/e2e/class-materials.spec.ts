@@ -290,6 +290,13 @@ test.describe("a class's notes and documents", () => {
     await teacher(page, { uploadStatus: "queued" });
     await page.goto("/goal-planner");
 
+    // The prompt, the attach control and the library are one intake, not
+    // three modes: all of them reachable without choosing between them.
+    await expect(page.getByLabel("What should this term cover?")).toBeVisible();
+    await expect(page.getByRole("button", { name: /attach a document/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /shared library/i })).toBeVisible();
+    await expect(page.getByText("Grade 9 Physics syllabus already on this class")).toBeVisible();
+
     await page.setInputFiles('input[type="file"]', {
       name: "syllabus.pdf",
       mimeType: "application/pdf",
@@ -300,7 +307,7 @@ test.describe("a class's notes and documents", () => {
     // "queued" at complete, "ready" on the next poll — the chip has to
     // move on its own, without another click.
     await expect(page.getByText("Reading your document…")).toBeVisible();
-    await expect(page.getByText("Ready")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Ready", { exact: true })).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("button", { name: /remove syllabus\.pdf/i }).click();
     await expect(page.getByText("syllabus.pdf")).toBeHidden();
