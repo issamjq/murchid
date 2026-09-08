@@ -734,3 +734,26 @@ create policy "owner reads own subscription" on public.subscriptions
 drop policy if exists "admins read all subscriptions" on public.subscriptions;
 create policy "admins read all subscriptions" on public.subscriptions
   for select using (public.is_admin() and public.session_ok());
+
+-- ── Report-card comments: one live comment per student per class ──
+-- No term/semester concept exists anywhere else in the schema (only
+-- goals.term_start/term_end, scoped to the Goal Planner) — this doesn't
+-- invent one either.
+create table if not exists public.report_comments (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  class_id uuid not null references public.classes(id) on delete cascade,
+  student_id uuid not null references public.students(id) on delete cascade,
+  comment_text text,
+  status text not null default 'draft' check (status in ('draft','approved')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (class_id, student_id)
+);
+
+alter table public.report_comments enable row level security;
+
+drop policy if exists "owner full access" on public.report_comments;
+create policy "owner full access" on public.report_comments for all
+  using (owner_id = auth.uid() and public.session_ok())
+  with check (owner_id = auth.uid() and public.session_ok());

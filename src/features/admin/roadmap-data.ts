@@ -86,6 +86,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     ],
   },
   {
+    id: "report-comments",
+    title: "Report-card comment drafting",
+    period: "Completed",
+    status: "done",
+    summary:
+      "Each student's results and attendance, next to an editable, AI-draftable comment — instead of writing a whole class's report cards from memory.",
+    items: [
+      "Frontend and schema ship now; a plain factual template fills in until the backend half lands — see todo/backend/14-report-comment-spec.md",
+      "Scores are listed per assessment, not averaged — there's no common scale to blend a quiz and an exam mark into one honest percentage",
+      "Fourth of a 9-item teacher quality-of-life roadmap; the rest are queued up one at a time",
+    ],
+  },
+  {
     id: "full-redesign",
     title: "Full site redesign",
     period: "Target: Sun, 20 Sep 2026",

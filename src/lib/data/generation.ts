@@ -44,6 +44,28 @@ export function generateContent(
   });
 }
 
+export interface ReportCommentStudent {
+  name: string;
+  results: { title: string; score: number | null }[];
+  attendance: { present: number; late: number; absent: number; total: number };
+}
+
+// A distinct "feature" value on the same /studio/generate endpoint (not
+// yet in the `Feature` union above, which enumerates goal_item/assessment
+// kinds) — the request shape here carries `student`, not just a prompt.
+// See todo/backend/14-report-comment-spec.md.
+export function generateReportComment(
+  classId: string,
+  student: ReportCommentStudent,
+  note?: string,
+): Promise<GenerationResult> {
+  return backendFetch<GenerationResult>("/studio/generate", {
+    method: "POST",
+    body: { feature: "report_comment", classId, prompt: note ?? "", student },
+    timeoutMs: 90_000,
+  });
+}
+
 export function unreadMaterialsNotice(result: GenerationResult): string | undefined {
   const count = result.unread_materials?.length ?? 0;
   if (count === 0) return undefined;
