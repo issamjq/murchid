@@ -173,6 +173,7 @@ export interface PlanStartedData {
   quote?: number;
   sources?: string[];
   unread_materials?: unknown[];
+  attachments?: { read: string[]; problems: string[] };
 }
 export interface PlanItemData {
   kind: string;

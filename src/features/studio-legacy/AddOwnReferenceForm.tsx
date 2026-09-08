@@ -4,7 +4,9 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { ClassFileUpload } from "@/shared/class-file-upload";
 import { attachOwnReference } from "@/lib/data/classes";
 
 export function AddOwnReferenceForm({
@@ -38,7 +40,19 @@ export function AddOwnReferenceForm({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      <ClassFileUpload classId={classId} clearWhenReady onAttached={onAttached} />
+      <p className="text-xs text-muted-foreground">
+        Scanned PDFs are transcribed automatically — the file shows up in Notes &amp; text
+        once it&apos;s read.
+      </p>
+
+      <div className="flex items-center gap-2">
+        <Separator className="flex-1" />
+        <span className="text-xs text-muted-foreground">or type it out</span>
+        <Separator className="flex-1" />
+      </div>
+
       <Input
         placeholder="e.g. Grade 10 Social Studies syllabus — Term 2"
         value={title}
@@ -52,10 +66,6 @@ export function AddOwnReferenceForm({
         onChange={(e) => setBodyMd(e.target.value)}
         className="resize-none text-xs"
       />
-      <p className="text-xs text-muted-foreground">
-        No file-upload/OCR pipeline yet — paste the text directly. It shows up in Notes &amp;
-        text right after.
-      </p>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       <Button size="sm" onClick={submit} disabled={saving || !title.trim() || !bodyMd.trim()}>
         {saving ? "Saving…" : "Add & attach"}

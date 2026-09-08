@@ -13,6 +13,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSession } from "@/features/auth/session-context";
 import { AddOwnReferenceForm } from "@/features/studio-legacy/AddOwnReferenceForm";
+import { ClassFileUpload } from "@/shared/class-file-upload";
 import { BackendError } from "@/lib/data/backend";
 import {
   listHierarchy,
@@ -204,6 +205,7 @@ export function GoalPlannerForm() {
   const [classId, setClassId] = useState<string>("");
   const [prompt, setPrompt] = useState("");
   const [hasReference, setHasReference] = useState<boolean | null>(null);
+  const [hasAttachment, setHasAttachment] = useState(false);
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<Set<string>>(new Set());
 
   const [goal, setGoal] = useState<GoalRow | null>(null);
@@ -237,7 +239,11 @@ export function GoalPlannerForm() {
     hasReferenceMaterial(classId).then(setHasReference);
   }, [classId]);
 
-  const grounded = hasReference || prompt.trim().length >= MIN_GROUNDED_PROMPT_LENGTH;
+  useEffect(() => {
+    setHasAttachment(false);
+  }, [classId]);
+
+  const grounded = hasReference || hasAttachment || prompt.trim().length >= MIN_GROUNDED_PROMPT_LENGTH;
   const canGenerate = Boolean(classId) && Boolean(user) && grounded && stage === "intake";
 
   function toggleMaterial(id: string) {
@@ -424,7 +430,7 @@ export function GoalPlannerForm() {
               <TabsTrigger value="upload">Upload documents</TabsTrigger>
               <TabsTrigger value="library">Shared library</TabsTrigger>
             </TabsList>
-            <TabsContent value="prompt">
+            <TabsContent value="prompt" className="space-y-2">
               <Textarea
                 rows={6}
                 value={prompt}
@@ -432,6 +438,14 @@ export function GoalPlannerForm() {
                 disabled={stage !== "intake"}
                 placeholder="e.g. Term 2, Unit 3: Trade routes of the ancient world. Cover the Silk Road, maritime trade, and the spread of ideas. Reference the Grade 10 CBSE Social Studies syllabus."
               />
+              {classId ? (
+                <ClassFileUpload
+                  key={classId}
+                  classId={classId}
+                  disabled={stage !== "intake"}
+                  onUsableChange={setHasAttachment}
+                />
+              ) : null}
             </TabsContent>
             <TabsContent value="upload">
               {user && classId ? (
@@ -507,6 +521,11 @@ export function GoalPlannerForm() {
                   plan may be missing that context.
                 </p>
               ) : null}
+              {started?.attachments?.problems.map((problem) => (
+                <p key={problem} className="text-xs text-warning">
+                  {problem}
+                </p>
+              ))}
 
               <div className="space-y-2">
                 {items.map((item) => (

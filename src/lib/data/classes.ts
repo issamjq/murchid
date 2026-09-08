@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { backendFetch } from "./backend";
 
 export interface ClassRow {
   id: string;
@@ -250,16 +251,40 @@ export interface MaterialRow {
   kind: string;
   body_md: string | null;
   created_at: string;
+  owner_id: string;
+  is_shared: boolean;
+  // Set when the material came from an uploaded file rather than typed
+  // text: body_md then holds what the backend read out of that file.
+  storage_path: string | null;
 }
 
 export async function listMaterialsForClass(classId: string): Promise<MaterialRow[]> {
   const db = requireClient();
   const { data, error } = await db
     .from("class_materials")
-    .select("material:materials(id, title, kind, body_md, created_at)")
+    .select(
+      "material:materials(id, title, kind, body_md, created_at, owner_id, is_shared, storage_path)",
+    )
     .eq("class_id", classId);
   if (error) throw error;
   return ((data ?? []) as unknown as { material: MaterialRow }[]).map((l) => l.material);
+}
+
+export async function updateMaterial(
+  materialId: string,
+  patch: { title: string; body_md: string },
+): Promise<void> {
+  const db = requireClient();
+  const { error } = await db.from("materials").update(patch).eq("id", materialId);
+  if (error) throw error;
+}
+
+// Goes to the backend rather than straight to Supabase because an
+// uploaded material owns Backblaze objects — the original file and the
+// Markdown read out of it — that a row delete would orphan. It answers
+// 403 for shared curriculum material and 404 for a row that isn't hers.
+export function deleteMaterial(materialId: string): Promise<{ deleted: boolean }> {
+  return backendFetch(`/studio/materials/${materialId}`, { method: "DELETE" });
 }
 
 // A class needs at least one attached reference (syllabus, curriculum,

@@ -4,10 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { FileText } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useSession } from "@/features/auth/session-context";
+import { MaterialCard } from "@/features/classes/material-card";
 import { useStudio } from "@/features/studio-legacy/studio-context";
 import { StudioComposerBar } from "@/features/studio-legacy/StudioComposerBar";
 import { generateContent, unreadMaterialsNotice } from "@/lib/data/generation";
@@ -58,18 +57,13 @@ export default function ClassNotesPage() {
         ) : (
           <div className="space-y-3">
             {items.map((n) => (
-              <Card key={n.id}>
-                <CardContent className="flex items-center justify-between p-4">
-                  <p className="text-sm font-medium">{n.title}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => open({ title: n.title, kind: "Note", content: n.body_md })}
-                  >
-                    Open
-                  </Button>
-                </CardContent>
-              </Card>
+              <MaterialCard
+                key={n.id}
+                material={n}
+                canManage={n.owner_id === user?.id && !n.is_shared}
+                onOpen={() => open({ title: n.title, kind: "Note", content: n.body_md })}
+                onChanged={refresh}
+              />
             ))}
           </div>
         )}
