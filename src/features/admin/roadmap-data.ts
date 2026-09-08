@@ -10,7 +10,7 @@ export type RoadmapCheckpoint = {
 };
 
 // Edit this list to update the roadmap — the page reads straight from it.
-export const ROADMAP_UPDATED = "6 Sep 2026";
+export const ROADMAP_UPDATED = "8 Sep 2026";
 
 export const ROADMAP: RoadmapCheckpoint[] = [
   {
@@ -45,6 +45,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     status: "done",
     summary: "Swapped placeholder art for real photography on the public-facing landing page.",
     items: ["Hero, features grid, and roles section now use real photography"],
+  },
+  {
+    id: "needs-attention-digest",
+    title: "Needs-your-attention digest on Overview",
+    period: "Completed",
+    status: "done",
+    summary:
+      "Replaced the passive \"pending review\" count with an actionable, deep-linked list of what a teacher should go do next.",
+    items: [
+      "Stale attendance, ungraded assessments, unscheduled drafts, and failed term-plan generations surfaced in one card",
+      "Every item deep-links straight to the right class tab — no dead ends",
+      "First of a 9-item teacher quality-of-life roadmap; the rest are queued up one at a time",
+    ],
   },
   {
     id: "full-redesign",

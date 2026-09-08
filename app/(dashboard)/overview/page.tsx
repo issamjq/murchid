@@ -23,14 +23,29 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/features/auth/session-context";
 import { getOverviewSnapshot, type OverviewSnapshot } from "@/lib/data/overview";
+import {
+  getNeedsAttention,
+  type AttentionCategory,
+  type AttentionItem,
+} from "@/lib/data/needs-attention";
+import { NeedsAttentionCard } from "@/features/overview/needs-attention-card";
 
 export default function OverviewPage() {
   const { user } = useSession();
   const [snapshot, setSnapshot] = useState<OverviewSnapshot | null>(null);
+  const [attentionItems, setAttentionItems] = useState<AttentionItem[] | null>(null);
+  const [attentionCounts, setAttentionCounts] = useState<Record<
+    AttentionCategory,
+    number
+  > | null>(null);
 
   useEffect(() => {
     if (!user) return;
     getOverviewSnapshot(user.id).then(setSnapshot);
+    getNeedsAttention(user.id).then(({ items, totalCounts }) => {
+      setAttentionItems(items);
+      setAttentionCounts(totalCounts);
+    });
   }, [user]);
 
   const loaded = snapshot !== null;
@@ -42,6 +57,8 @@ export default function OverviewPage() {
         description="Where your classes stand this week."
       />
       <div className="space-y-5 p-6 md:p-8">
+        <NeedsAttentionCard items={attentionItems} totalCounts={attentionCounts} />
+
         {loaded && snapshot.classCount === 0 ? (
           <EmptyState
             icon={BookOpen}

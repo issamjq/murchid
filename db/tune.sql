@@ -267,9 +267,15 @@ alter table public.goals add column if not exists error text;
 alter table public.goals add column if not exists updated_at timestamptz not null default now();
 alter table public.goals add column if not exists term_start date;
 alter table public.goals add column if not exists term_end date;
-alter table public.goals add constraint goals_term_order_check
-  check (term_start is null or term_end is null or term_start <= term_end) not valid;
-alter table public.goals validate constraint goals_term_order_check;
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'goals_term_order_check'
+  ) then
+    alter table public.goals add constraint goals_term_order_check
+      check (term_start is null or term_end is null or term_start <= term_end) not valid;
+    alter table public.goals validate constraint goals_term_order_check;
+  end if;
+end $$;
 
 create table if not exists public.goal_items (
   id uuid primary key default gen_random_uuid(),
@@ -420,6 +426,43 @@ drop policy if exists "owner full access" on public.attendance;
 create policy "owner full access" on public.attendance for all
   using (owner_id = auth.uid() and public.session_ok())
   with check (owner_id = auth.uid() and public.session_ok());
+
+-- ── Needs-attention digest: read-only aggregate views ──
+-- Plain views (no `security definer`) over RLS-protected tables inherit
+-- RLS from the querying role, so `owner_id = auth.uid()` filters applied
+-- by the caller still narrow these to that teacher's own rows.
+create or replace view public.assessment_progress as
+select
+  a.id as assessment_id,
+  a.owner_id,
+  a.class_id,
+  a.kind,
+  a.title,
+  a.scheduled_for,
+  c.subject,
+  (select count(*) from public.class_members cm where cm.class_id = a.class_id) as roster_count,
+  (select count(*) from public.results r where r.assessment_id = a.id) as graded_count
+from public.assessments a
+join public.classes c on c.id = a.class_id;
+
+create or replace view public.class_attendance_freshness as
+select
+  c.id as class_id,
+  c.owner_id,
+  c.subject,
+  max(a.date) as last_marked
+from public.classes c
+left join public.attendance a on a.class_id = c.id
+group by c.id, c.owner_id, c.subject;
+
+-- goal_items has no class_id of its own — it hangs off goals.class_id.
+create or replace view public.goal_item_details as
+select
+  gi.id, gi.owner_id, gi.kind, gi.title, gi.scheduled_for, gi.updated_at,
+  g.class_id, c.subject
+from public.goal_items gi
+join public.goals g on g.id = gi.goal_id
+join public.classes c on c.id = g.class_id;
 
 -- Preparation (drafting) is open to pending teachers; only actions that
 -- reach real students require an approved profile.
