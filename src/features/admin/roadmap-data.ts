@@ -73,6 +73,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     ],
   },
   {
+    id: "tiered-worksheets",
+    title: "Differentiated worksheets on Homework",
+    period: "Completed",
+    status: "done",
+    summary:
+      "Optional \"also generate\" toggles for a simplified or challenge version alongside the standard worksheet — one prompt instead of writing each level by hand.",
+    items: [
+      "Frontend and schema ship now; degrades honestly (clear notice, no crash) until the backend half lands — see todo/backend/13-tiered-worksheets-spec.md",
+      "Every other generator (lessons, presentations, activities, notes, quizzes, exams) is untouched — zero visual or behavioral change",
+      "Third of a 9-item teacher quality-of-life roadmap; the rest are queued up one at a time",
+    ],
+  },
+  {
     id: "full-redesign",
     title: "Full site redesign",
     period: "Target: Sun, 20 Sep 2026",

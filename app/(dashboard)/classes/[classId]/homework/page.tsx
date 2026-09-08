@@ -11,13 +11,23 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useSession } from "@/features/auth/session-context";
 import { useStudio } from "@/features/studio-legacy/studio-context";
 import { StudioComposerBar } from "@/features/studio-legacy/StudioComposerBar";
-import { generateContent, unreadMaterialsNotice } from "@/lib/data/generation";
+import { generateContent, unreadMaterialsNotice, type Tier } from "@/lib/data/generation";
 import {
   listGoalItemsByKind,
-  createGoalItemFromPrompt,
+  createTieredGoalItemsFromPrompt,
   hasReferenceMaterial,
   type GoalItemRow,
 } from "@/lib/data/classes";
+
+const TIER_OPTIONS = [
+  { key: "support", label: "Simplified" },
+  { key: "extend", label: "Challenge" },
+];
+
+const TIER_BADGE: Record<string, string> = {
+  support: "Simplified",
+  extend: "Challenge",
+};
 
 export default function ClassHomeworkPage() {
   const { classId } = useParams<{ classId: string }>();
@@ -35,12 +45,20 @@ export default function ClassHomeworkPage() {
     refresh();
   }, [refresh]);
 
-  async function handleCreate(prompt: string) {
+  async function handleCreate(prompt: string, tiers: string[] = []) {
     if (!user || !hasReference) return;
-    const result = await generateContent("homework", classId, prompt);
-    await createGoalItemFromPrompt(user.id, classId, "homework", prompt, result);
+    const requestedTiers = tiers as Tier[];
+    const result = await generateContent("homework", classId, prompt, requestedTiers);
+    await createTieredGoalItemsFromPrompt(user.id, classId, "homework", prompt, result);
     refresh();
-    const notice = unreadMaterialsNotice(result);
+
+    const notices = [unreadMaterialsNotice(result)];
+    if (requestedTiers.length > 0 && !result.additional) {
+      notices.push(
+        "Differentiated versions aren't available yet — generated the standard worksheet only.",
+      );
+    }
+    const notice = notices.filter(Boolean).join(" ");
     return notice ? { notice } : undefined;
   }
 
@@ -64,7 +82,14 @@ export default function ClassHomeworkPage() {
               <Card key={h.id}>
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
-                    <p className="text-sm font-medium">{h.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{h.title}</p>
+                      {h.tier ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
+                          {TIER_BADGE[h.tier] ?? h.tier}
+                        </span>
+                      ) : null}
+                    </div>
                     {h.detail ? (
                       <p className="text-xs text-muted-foreground">{h.detail}</p>
                     ) : null}
@@ -97,6 +122,7 @@ export default function ClassHomeworkPage() {
           buttonLabel="Create"
           onSubmit={handleCreate}
           onAttached={refresh}
+          tierOptions={TIER_OPTIONS}
         />
       </div>
     </div>

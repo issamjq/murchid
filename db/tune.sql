@@ -292,6 +292,9 @@ create table if not exists public.goal_items (
   status text not null default 'draft' check (status in ('draft','approved','scheduled')),
   updated_at timestamptz not null default now()
 );
+-- Differentiated worksheets: a support/extend row is a sibling of the
+-- standard (tier = null) item under the same goal_id, not a new table.
+alter table public.goal_items add column if not exists tier text check (tier in ('support','extend'));
 
 -- Which library/uploaded materials actually fed a generated plan — the
 -- record class_materials can't carry, since it's what a plan is

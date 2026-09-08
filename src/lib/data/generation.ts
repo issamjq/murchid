@@ -9,6 +9,8 @@ export type Feature =
   | "quiz"
   | "exam";
 
+export type Tier = "support" | "extend";
+
 export interface GenerationResult {
   title: string;
   content: string;
@@ -16,16 +18,26 @@ export interface GenerationResult {
   // Shape not fully specified by the backend yet — treated as opaque,
   // only its length is relied on.
   unread_materials?: unknown[];
+  // Present only once the backend implements todo/backend/13 — its
+  // absence (when additionalTiers was sent) means "not built yet", not
+  // an error. See createTieredGoalItemsFromPrompt in lib/data/classes.ts.
+  additional?: Partial<Record<Tier, { title: string; content: string }>>;
 }
 
 export function generateContent(
   feature: Feature,
   classId: string,
   prompt: string,
+  additionalTiers?: Tier[],
 ): Promise<GenerationResult> {
   return backendFetch<GenerationResult>("/studio/generate", {
     method: "POST",
-    body: { feature, classId, prompt },
+    body: {
+      feature,
+      classId,
+      prompt,
+      ...(additionalTiers && additionalTiers.length > 0 ? { additionalTiers } : {}),
+    },
     // Generation is slower than a normal request — give it real room
     // rather than the default 30s.
     timeoutMs: 90_000,

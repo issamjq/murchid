@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 import { backendFetch } from "./backend";
+import type { GenerationResult, Tier } from "./generation";
 
 export interface ClassRow {
   id: string;
@@ -141,6 +142,9 @@ export interface GoalItemRow {
   content: { markdown: string } | null;
   scheduled_for: string | null;
   created_at: string;
+  // Null = the standard/core version. Set on a sibling item created
+  // alongside the core one by createTieredGoalItemsFromPrompt.
+  tier: Tier | null;
 }
 
 export async function listGoalItemsByKind(
@@ -157,7 +161,7 @@ export async function listGoalItemsByKind(
   if (goalIds.length === 0) return [];
   const { data, error } = await db
     .from("goal_items")
-    .select("id, kind, title, detail, content, scheduled_for, created_at")
+    .select("id, kind, title, detail, content, scheduled_for, created_at, tier")
     .in("goal_id", goalIds)
     .eq("kind", kind)
     .order("created_at", { ascending: false });
@@ -265,6 +269,48 @@ export async function createGoalItemFromPrompt(
     .single();
   if (itemError) throw itemError;
   return item as GoalItemRow;
+}
+
+// Like createGoalItemFromPrompt, but also writes a sibling goal_item per
+// tier present in result.additional — variants of one assignment, sharing
+// the same goal_id rather than three unrelated goals.
+export async function createTieredGoalItemsFromPrompt(
+  ownerId: string,
+  classId: string,
+  kind: GoalItemKind,
+  prompt: string,
+  result: GenerationResult,
+): Promise<GoalItemRow[]> {
+  const db = requireClient();
+  const { data: goal, error: goalError } = await db
+    .from("goals")
+    .insert({ owner_id: ownerId, class_id: classId, prompt, source: "prompt", status: "draft" })
+    .select()
+    .single();
+  if (goalError) throw goalError;
+
+  const rows = [
+    { tier: null as Tier | null, title: result.title, content: result.content },
+    ...(Object.entries(result.additional ?? {}) as [Tier, { title: string; content: string }][]).map(
+      ([tier, variant]) => ({ tier, title: variant.title, content: variant.content }),
+    ),
+  ];
+
+  const { data, error } = await db
+    .from("goal_items")
+    .insert(
+      rows.map((r) => ({
+        owner_id: ownerId,
+        goal_id: goal.id,
+        kind,
+        title: r.title,
+        content: { markdown: r.content },
+        tier: r.tier,
+      })),
+    )
+    .select();
+  if (error) throw error;
+  return data as GoalItemRow[];
 }
 
 // ── Assessments: quizzes and exams ──

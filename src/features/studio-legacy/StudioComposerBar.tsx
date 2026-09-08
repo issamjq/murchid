@@ -18,22 +18,34 @@ export function StudioComposerBar({
   canSend = true,
   disabledHint,
   onAttached,
+  tierOptions,
 }: {
   placeholder: string;
   buttonLabel: string;
-  onSubmit: (prompt: string) => Promise<{ notice?: string } | void>;
+  onSubmit: (prompt: string, tiers?: string[]) => Promise<{ notice?: string } | void>;
   classId: string;
   ownerId: string | null;
   feature: string;
   canSend?: boolean;
   disabledHint?: string;
   onAttached?: () => void;
+  // When provided, renders a toggle per entry above the textarea ("also
+  // generate a simplified/challenge version") and passes the selection
+  // as onSubmit's second argument. Omit to leave this composer unchanged.
+  tierOptions?: { key: string; label: string }[];
 }) {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
+
+  function toggleTier(key: string) {
+    setSelectedTiers((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  }
 
   async function submit() {
     const value = prompt.trim();
@@ -42,7 +54,7 @@ export function StudioComposerBar({
     setError(null);
     setNotice(null);
     try {
-      const result = await onSubmit(value);
+      const result = await onSubmit(value, selectedTiers);
       if (ownerId) logGeneration(ownerId, feature, classId);
       setPrompt("");
       if (result?.notice) setNotice(result.notice);
@@ -64,6 +76,28 @@ export function StudioComposerBar({
             onAttached?.();
           }}
         />
+      ) : null}
+      {tierOptions && tierOptions.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5 px-1">
+          <span className="text-xs text-muted-foreground">Also generate:</span>
+          {tierOptions.map((opt) => {
+            const active = selectedTiers.includes(opt.key);
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => toggleTier(opt.key)}
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-input bg-background text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       ) : null}
       <div className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm">
         <Button
