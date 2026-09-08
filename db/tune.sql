@@ -254,22 +254,54 @@ create table if not exists public.goals (
   owner_id uuid not null references auth.users(id) on delete cascade,
   prompt text,
   source text not null default 'prompt' check (source in ('prompt','upload','library')),
-  status text not null default 'draft' check (status in ('draft','approved')),
+  status text not null default 'draft' check (status in ('drafting','draft','approved','failed')),
   created_at timestamptz not null default now(),
   approved_at timestamptz
 );
+-- Added once the real backend's streaming /studio/plan endpoint shipped:
+-- 'drafting' while the SSE stream is in flight, 'failed' if it dies
+-- mid-stream, title/error for the UI, term_start/term_end from
+-- /schedule, updated_at touched on every status transition.
+alter table public.goals add column if not exists title text;
+alter table public.goals add column if not exists error text;
+alter table public.goals add column if not exists updated_at timestamptz not null default now();
+alter table public.goals add column if not exists term_start date;
+alter table public.goals add column if not exists term_end date;
+alter table public.goals add constraint goals_term_order_check
+  check (term_start is null or term_end is null or term_start <= term_end) not valid;
+alter table public.goals validate constraint goals_term_order_check;
 
 create table if not exists public.goal_items (
   id uuid primary key default gen_random_uuid(),
   goal_id uuid not null references public.goals(id) on delete cascade,
   owner_id uuid not null references auth.users(id) on delete cascade,
-  kind text not null check (kind in ('lesson_plan','slide_deck','notes','quiz','exam','activity','homework')),
+  -- 'note' is singular — matches the backend's generation response and
+  -- materials.kind, not the old plural 'notes'.
+  kind text not null check (kind in ('lesson_plan','slide_deck','note','quiz','exam','activity','homework')),
   title text not null,
   detail text,
   content jsonb,
   scheduled_for date,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  status text not null default 'draft' check (status in ('draft','approved','scheduled')),
+  updated_at timestamptz not null default now()
 );
+
+-- Which library/uploaded materials actually fed a generated plan — the
+-- record class_materials can't carry, since it's what a plan is
+-- grounded in, not what's merely attached to the class.
+create table if not exists public.goal_sources (
+  goal_id uuid not null references public.goals(id) on delete cascade,
+  material_id uuid not null references public.materials(id) on delete cascade,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (goal_id, material_id)
+);
+alter table public.goal_sources enable row level security;
+drop policy if exists "owner full access" on public.goal_sources;
+create policy "owner full access" on public.goal_sources for all
+  using (owner_id = auth.uid() and public.session_ok())
+  with check (owner_id = auth.uid() and public.session_ok());
 
 create table if not exists public.assessments (
   id uuid primary key default gen_random_uuid(),
@@ -445,7 +477,7 @@ create policy "owner updates goals, approval needs active status" on public.goal
     owner_id = auth.uid()
     and public.session_ok()
     and (
-      status = 'draft'
+      status in ('drafting', 'draft', 'failed')
       or exists (select 1 from public.profiles p where p.id = auth.uid() and p.status = 'active')
     )
   );

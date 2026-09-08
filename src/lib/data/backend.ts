@@ -14,7 +14,7 @@ export class BackendError extends Error {
   }
 }
 
-async function authHeader(): Promise<Record<string, string>> {
+export async function authHeader(): Promise<Record<string, string>> {
   if (!supabase) throw new Error("Supabase is not configured");
   const {
     data: { session },

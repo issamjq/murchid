@@ -126,7 +126,7 @@ export async function createClass(ownerId: string, divisionId: string, subject: 
 export type GoalItemKind =
   | "lesson_plan"
   | "slide_deck"
-  | "notes"
+  | "note"
   | "quiz"
   | "exam"
   | "activity"
@@ -383,7 +383,7 @@ export async function deleteClass(id: string) {
 export interface UpcomingItem {
   id: string;
   title: string;
-  kind: "quiz" | "exam" | "slide_deck" | "notes" | "activity" | "homework";
+  kind: "quiz" | "exam" | "slide_deck" | "note" | "activity" | "homework";
   scheduledFor: string;
   classLabel: string;
   classId: string;

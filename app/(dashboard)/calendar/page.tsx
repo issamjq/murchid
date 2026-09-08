@@ -14,7 +14,7 @@ const KIND_LABEL: Record<UpcomingItem["kind"], string> = {
   quiz: "Quiz",
   exam: "Exam",
   slide_deck: "Presentation",
-  notes: "Notes",
+  note: "Notes",
   activity: "Activity",
   homework: "Homework",
 };
