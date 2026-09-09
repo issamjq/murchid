@@ -757,3 +757,31 @@ drop policy if exists "owner full access" on public.report_comments;
 create policy "owner full access" on public.report_comments for all
   using (owner_id = auth.uid() and public.session_ok())
   with check (owner_id = auth.uid() and public.session_ok());
+
+-- ── Curriculum coverage: foundation only — no UI reads this yet ──
+-- `source` distinguishes a teacher-typed unit from one
+-- POST /api/curriculum/derive produced (todo/backend/15) — both are rows
+-- in the same table, and coverage math doesn't care which.
+create table if not exists public.syllabus_units (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  class_id uuid not null references public.classes(id) on delete cascade,
+  seq int not null,
+  title text not null,
+  outcomes text[] not null default '{}',
+  typical_weeks numeric,
+  source text not null default 'manual' check (source in ('manual','derived')),
+  created_at timestamptz not null default now(),
+  unique (class_id, seq)
+);
+
+alter table public.syllabus_units enable row level security;
+
+drop policy if exists "owner full access" on public.syllabus_units;
+create policy "owner full access" on public.syllabus_units for all
+  using (owner_id = auth.uid() and public.session_ok())
+  with check (owner_id = auth.uid() and public.session_ok());
+
+-- Tags a lesson/homework/etc. as covering a unit — nullable, so untagged
+-- items (all of them, until the coverage UI ships) are unaffected.
+alter table public.goal_items add column if not exists unit_id uuid references public.syllabus_units(id) on delete set null;

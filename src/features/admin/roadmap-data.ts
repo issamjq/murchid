@@ -10,7 +10,7 @@ export type RoadmapCheckpoint = {
 };
 
 // Edit this list to update the roadmap — the page reads straight from it.
-export const ROADMAP_UPDATED = "8 Sep 2026";
+export const ROADMAP_UPDATED = "9 Sep 2026";
 
 export const ROADMAP: RoadmapCheckpoint[] = [
   {
@@ -96,6 +96,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
       "Frontend and schema ship now; a plain factual template fills in until the backend half lands — see todo/backend/14-report-comment-spec.md",
       "Scores are listed per assessment, not averaged — there's no common scale to blend a quiz and an exam mark into one honest percentage",
       "Fourth of a 9-item teacher quality-of-life roadmap; the rest are queued up one at a time",
+    ],
+  },
+  {
+    id: "curriculum-coverage-foundation",
+    title: "Curriculum coverage — groundwork laid",
+    period: "In progress",
+    status: "in-progress",
+    summary:
+      "A syllabus-derive endpoint mentioned in old backend notes turned out not to exist anywhere — schema and backend spec now written from scratch so the real tracker UI can follow.",
+    items: [
+      "New syllabus_units table (manual or AI-derived units) and a goal_items.unit_id tag, both live in Supabase",
+      "Backend spec for POST /api/curriculum/derive written — todo/backend/15-curriculum-derive-spec.md",
+      "Manual-entry UI and the AI-derive UI are deliberately being built together in the next pass, not staged separately",
     ],
   },
   {
