@@ -2,12 +2,12 @@ import { test, expect, type Page } from "@playwright/test";
 
 // Differentiated worksheets, actually clicked.
 //
-// The backend doesn't implement additionalTiers yet (todo/backend/13), so
-// this proves the degrade-cleanly path against today's REAL response shape
-// (no `additional` key) — a teacher who checks a tier box gets an honest
-// notice, not a silent no-op or a crash — plus the future path once the
-// backend ships it. No account and no network: PostgREST and the backend
-// are stubbed, same pattern as class-materials.spec.ts.
+// additionalTiers is live on the backend now, so the `additional` case is
+// the everyday path and the missing-key case is the safety net — kept
+// because an older deployment behind the proxy would land there, and a
+// teacher who checked a tier box deserves an honest notice rather than a
+// silent no-op. No account and no network: PostgREST and the backend are
+// stubbed, same pattern as class-materials.spec.ts.
 
 const USER = {
   id: "00000000-0000-0000-0000-0000000000aa",

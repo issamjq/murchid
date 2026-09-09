@@ -70,9 +70,10 @@ function localTemplate(name: string, summary: StudentSummary): string {
   return `${attendance}${work}`;
 }
 
-// Same confirmed-400/404 fallback contract as draftReportComment:
-// "parent_update" is a new feature value the current backend rejects, so
-// the teacher still gets a usable starting draft, tagged as a template.
+// Same safety net as draftReportComment — the backend implements
+// parent_update now. Branching on e.status rather than e.code is what
+// keeps it working: validation failures answer "validation_error", not
+// the "bad_request" the spec asked for.
 export async function draftParentUpdate(
   classId: string,
   studentName: string,

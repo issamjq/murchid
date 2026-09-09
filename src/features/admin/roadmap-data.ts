@@ -80,7 +80,7 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     summary:
       "Optional \"also generate\" toggles for a simplified or challenge version alongside the standard worksheet — one prompt instead of writing each level by hand.",
     items: [
-      "Frontend and schema ship now; degrades honestly (clear notice, no crash) until the backend half lands — see todo/backend/13-tiered-worksheets-spec.md",
+      "Live end to end — the backend half shipped, and tiers turned out to work on any generated document, not just homework",
       "Every other generator (lessons, presentations, activities, notes, quizzes, exams) is untouched — zero visual or behavioral change",
       "Third of a 9-item teacher quality-of-life roadmap; the rest are queued up one at a time",
     ],
@@ -93,7 +93,7 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     summary:
       "Each student's results and attendance, next to an editable, AI-draftable comment — instead of writing a whole class's report cards from memory.",
     items: [
-      "Frontend and schema ship now; a plain factual template fills in until the backend half lands — see todo/backend/14-report-comment-spec.md",
+      "Live end to end — comments are now AI-drafted from the student's record, with the template kept only as a safety net",
       "Scores are listed per assessment, not averaged — there's no common scale to blend a quiz and an exam mark into one honest percentage",
       "Fourth of a 9-item teacher quality-of-life roadmap; the rest are queued up one at a time",
     ],
@@ -107,7 +107,7 @@ export const ROADMAP: RoadmapCheckpoint[] = [
       "A syllabus-derive endpoint mentioned in old backend notes turned out not to exist anywhere — schema and backend spec now written from scratch so the real tracker UI can follow.",
     items: [
       "New syllabus_units table (manual or AI-derived units) and a goal_items.unit_id tag, both live in Supabase",
-      "Backend spec for POST /api/curriculum/derive written — todo/backend/15-curriculum-derive-spec.md",
+      "The derive endpoint is now live and refuses text that isn't a syllabus rather than inventing units — the tracker UI is what's left",
       "Manual-entry UI and the AI-derive UI are deliberately being built together in the next pass, not staged separately",
     ],
   },
@@ -119,9 +119,9 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     summary:
       "A generated lesson, quiz or worksheet now records which of the class's reference materials it drew on, shown under the draft when you open it.",
     items: [
-      "Works today by resolving the same material set the backend grounds on; defers to the backend's own list the moment it starts sending one",
+      "Now names the documents a draft was genuinely written from, reported by the backend rather than inferred",
       "Stored alongside the draft, so it's still there when the record is reopened weeks later",
-      "Backend spec for the exact list (after its prompt-budget cap) — todo/backend/16-grounded-sources-spec.md",
+      "The earlier client-side guess was retired: measured against real data it named five documents a draft was specifically not written from",
     ],
   },
   {
@@ -134,7 +134,7 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     items: [
       "Copy, never send: nothing in the product can email anyone, so the UI says so plainly rather than implying otherwise",
       "The draft quotes attendance but never raw marks — a score means nothing to a parent while assessments carry no total",
-      "Backend spec written — todo/backend/17-parent-update-spec.md",
+      "Live end to end — and the backend withholds marks from the model entirely, so an uninterpretable score can't reach a parent even by accident",
     ],
   },
   {

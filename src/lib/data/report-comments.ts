@@ -119,11 +119,13 @@ function localTemplate(name: string, summary: StudentSummary): string {
   return `${name} ${scoreLine} this term, and ${attendanceLine}.`;
 }
 
-// Tries the real endpoint; falls back to a plain factual local template on
-// a confirmed 400/404 — "report_comment" is a brand-new `feature` value, so
-// the current backend rejecting it with 400 (missing/invalid feature) is
-// the actual documented behavior, not a guess. See
-// todo/backend/14-report-comment-spec.md.
+// The backend implements report_comment now, so this is a safety net
+// rather than the expected path.
+//
+// Branching on e.status is load-bearing: the route answers a validation
+// failure with code "validation_error", NOT the "bad_request" the spec
+// asked for. A fallback keyed on the code string would never fire and the
+// teacher would see a raw error where a drafted sentence belongs.
 export async function draftReportComment(
   classId: string,
   studentName: string,

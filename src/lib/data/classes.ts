@@ -134,10 +134,13 @@ export type GoalItemKind =
   | "activity"
   | "homework";
 
-/** The materials a draft was grounded in — document-level provenance. */
+/** The materials a draft was grounded in — document-level provenance.
+ * `origin` tells the teacher's own attachment apart from a curriculum
+ * chapter the backend matched for her. */
 export interface GroundedSource {
   id: string;
   title: string;
+  origin?: "class" | "library" | "curriculum";
 }
 
 export interface ArtifactContent {
@@ -254,22 +257,21 @@ export async function listScheduledForDate(
 
 /** What a generation drew on, for the "Grounded in" list on the draft.
  *
- * Prefers the backend's own answer once it reports one (todo/backend/16).
- * Until then it computes the same set the backend's spec says it
- * concatenates: the class's attached materials that have readable text. A
- * material with a storage_path but no body_md is exactly what the backend
- * already reports as unread, so excluding those matches its behaviour. The
- * one thing this can't see is the backend's prompt-budget cap silently
- * dropping a material — which is why the real list is worth returning. */
-export async function resolveGroundedOn(
-  result: { grounded_on?: GroundedSource[] },
-  classId: string,
-): Promise<GroundedSource[]> {
-  if (result.grounded_on) return result.grounded_on;
-  const materials = await listMaterialsForClass(classId);
-  return materials
-    .filter((m) => (m.body_md ?? "").trim().length > 0)
-    .map((m) => ({ id: m.id, title: m.title }));
+ * The backend reports this now, and it is the only trustworthy source of
+ * it. This used to fall back to guessing client-side — every attached
+ * material with readable text — on the assumption that the only thing the
+ * guess could miss was the prompt-budget cap. Measured against real data
+ * the guess was wrong six to one: of six materials attached to a class,
+ * one reached the model. The other five were drafts the studio itself had
+ * produced earlier, which the backend deliberately withholds as reference
+ * (handing them back is how a Linear Equations plan came to answer an
+ * English question). So the panel was naming five documents a draft was
+ * specifically NOT written from.
+ *
+ * Provenance is exactly the wrong place to be confidently wrong, so there
+ * is no fallback any more: no list from the backend means no list shown. */
+export function resolveGroundedOn(result: { grounded_on?: GroundedSource[] }): GroundedSource[] {
+  return result.grounded_on ?? [];
 }
 
 function artifactContent(markdown: string, groundedOn: GroundedSource[]): ArtifactContent {
@@ -284,7 +286,7 @@ export async function createGoalItemFromPrompt(
   generated: { title: string; content: string; grounded_on?: GroundedSource[] },
 ): Promise<GoalItemRow> {
   const db = requireClient();
-  const groundedOn = await resolveGroundedOn(generated, classId);
+  const groundedOn = resolveGroundedOn(generated);
   const { data: goal, error: goalError } = await db
     .from("goals")
     .insert({ owner_id: ownerId, class_id: classId, prompt, source: "prompt", status: "draft" })
@@ -318,7 +320,7 @@ export async function createTieredGoalItemsFromPrompt(
   result: GenerationResult,
 ): Promise<GoalItemRow[]> {
   const db = requireClient();
-  const groundedOn = await resolveGroundedOn(result, classId);
+  const groundedOn = resolveGroundedOn(result);
   const { data: goal, error: goalError } = await db
     .from("goals")
     .insert({ owner_id: ownerId, class_id: classId, prompt, source: "prompt", status: "draft" })
@@ -383,7 +385,7 @@ export async function createAssessmentFromPrompt(
   generated: { title: string; content: string; grounded_on?: GroundedSource[] },
 ): Promise<AssessmentRow> {
   const db = requireClient();
-  const groundedOn = await resolveGroundedOn(generated, classId);
+  const groundedOn = resolveGroundedOn(generated);
   const { data, error } = await db
     .from("assessments")
     .insert({

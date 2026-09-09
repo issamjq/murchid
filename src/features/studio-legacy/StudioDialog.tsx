@@ -91,6 +91,14 @@ function Dialog({ item, onClose }: { item: StudioItem; onClose: () => void }) {
                 {item.sources.map((source) => (
                   <li key={source.id} className="text-sm text-muted-foreground">
                     {source.title}
+                    {/* A curriculum chapter the backend matched isn't something
+                        she attached, so it shouldn't read as if she had. */}
+                    {source.origin === "curriculum" ? (
+                      <span className="ml-1.5 text-xs">· national curriculum</span>
+                    ) : null}
+                    {source.origin === "library" ? (
+                      <span className="ml-1.5 text-xs">· shared library</span>
+                    ) : null}
                   </li>
                 ))}
               </ul>

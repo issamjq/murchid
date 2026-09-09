@@ -804,7 +804,7 @@ create policy "owner full access" on public.report_comments for all
 
 -- ── Curriculum coverage: foundation only — no UI reads this yet ──
 -- `source` distinguishes a teacher-typed unit from one
--- POST /api/curriculum/derive produced (todo/backend/15) — both are rows
+-- POST /api/curriculum/derive produced (now live) — both are rows
 -- in the same table, and coverage math doesn't care which.
 create table if not exists public.syllabus_units (
   id uuid primary key default gen_random_uuid(),

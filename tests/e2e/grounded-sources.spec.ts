@@ -2,11 +2,11 @@ import { test, expect, type Page } from "@playwright/test";
 
 // Grounded sources, actually clicked.
 //
-// The backend doesn't return `grounded_on` yet (todo/backend/16), so this
-// proves the client-side resolution is right against today's real response
-// shape — only materials with readable text count, an uploaded-but-unread
-// file does not — and that an explicit backend list wins when it arrives.
-// Plus that a saved draft shows its sources when reopened.
+// The backend names the documents a draft was written from, and that list
+// is the only one shown — an earlier client-side guess was retired after it
+// measured wrong six to one against real data. So: the backend's list is
+// used verbatim, nothing is claimed when it sends none, and a saved draft
+// still shows its sources when reopened.
 
 const USER = {
   id: "00000000-0000-0000-0000-0000000000aa",
@@ -159,9 +159,7 @@ async function generateExam(page: Page) {
 }
 
 test.describe("grounded sources on a generated draft", () => {
-  test("records only materials with readable text when the backend sends no list", async ({
-    page,
-  }) => {
+  test("claims no sources at all when the backend names none", async ({ page }) => {
     const written = await teacher(page, {
       generateResponse: { title: "Forces exam", content: "Q1…" },
     });
@@ -173,14 +171,17 @@ test.describe("grounded sources on a generated draft", () => {
     const insert = written.find(
       (w) => w.method === "POST" && w.url.includes("/rest/v1/assessments"),
     );
-    const content = (insert!.body as { content: { markdown: string; groundedOn?: { id: string }[] } })
+    const content = (insert!.body as { content: { markdown: string; groundedOn?: unknown[] } })
       .content;
     expect(content.markdown).toBe("Q1…");
-    expect(content.groundedOn).toHaveLength(1);
-    expect(content.groundedOn![0].id).toBe(READABLE_ID);
+    // This used to guess from the attached materials. Measured against real
+    // data that guess was wrong six to one — it named studio-generated
+    // drafts the backend deliberately withholds. Saying nothing beats
+    // confidently naming documents a draft wasn't written from.
+    expect(content.groundedOn).toBeUndefined();
   });
 
-  test("prefers the backend's own grounded_on list when it sends one", async ({ page }) => {
+  test("uses the backend's grounded_on list verbatim", async ({ page }) => {
     const written = await teacher(page, {
       generateResponse: {
         title: "Forces exam",
