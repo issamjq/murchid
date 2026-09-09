@@ -785,3 +785,28 @@ create policy "owner full access" on public.syllabus_units for all
 -- Tags a lesson/homework/etc. as covering a unit — nullable, so untagged
 -- items (all of them, until the coverage UI ships) are unaffected.
 alter table public.goal_items add column if not exists unit_id uuid references public.syllabus_units(id) on delete set null;
+
+-- ── Parent updates: drafted for the teacher to copy, never sent ──
+-- Separate from report_comments (which is unique per class+student and
+-- written for the school record) because this is the same student in a
+-- different register, for a different reader. Nothing in this product
+-- can email anyone, so there is deliberately no guardian contact column
+-- and no send log — both arrive with a transport, not before it.
+create table if not exists public.parent_updates (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  class_id uuid not null references public.classes(id) on delete cascade,
+  student_id uuid not null references public.students(id) on delete cascade,
+  update_text text,
+  status text not null default 'draft' check (status in ('draft','approved')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (class_id, student_id)
+);
+
+alter table public.parent_updates enable row level security;
+
+drop policy if exists "owner full access" on public.parent_updates;
+create policy "owner full access" on public.parent_updates for all
+  using (owner_id = auth.uid() and public.session_ok())
+  with check (owner_id = auth.uid() and public.session_ok());

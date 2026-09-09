@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Printer, FileText } from "lucide-react";
+import { ChevronLeft, Printer, FileText, MessageSquare } from "lucide-react";
 
 import { ClassTabs } from "@/components/layout/class-tabs";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,12 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
               <Link href={`/classes/${classId}/report-comments`}>
                 <FileText />
                 Report comments
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/classes/${classId}/parent-updates`}>
+                <MessageSquare />
+                Parent updates
               </Link>
             </Button>
           </div>

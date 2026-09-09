@@ -125,6 +125,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     ],
   },
   {
+    id: "parent-updates",
+    title: "Parent updates, drafted to copy",
+    period: "Completed",
+    status: "done",
+    summary:
+      "A plain-language progress update per student, written for a parent rather than a colleague — drafted from the student's record, copied into whatever channel the teacher already uses.",
+    items: [
+      "Copy, never send: nothing in the product can email anyone, so the UI says so plainly rather than implying otherwise",
+      "The draft quotes attendance but never raw marks — a score means nothing to a parent while assessments carry no total",
+      "Backend spec written — todo/backend/17-parent-update-spec.md",
+    ],
+  },
+  {
     id: "full-redesign",
     title: "Full site redesign",
     period: "Target: Sun, 20 Sep 2026",

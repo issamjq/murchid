@@ -70,6 +70,22 @@ export function generateReportComment(
   });
 }
 
+// Same student payload as report_comment, different reader: this one is
+// written for a parent, so the backend is asked for plain language and no
+// bare unnormalized marks. See todo/backend/17-parent-update-spec.md.
+// Returns text only — nothing in this product sends anything.
+export function generateParentUpdate(
+  classId: string,
+  student: ReportCommentStudent,
+  note?: string,
+): Promise<GenerationResult> {
+  return backendFetch<GenerationResult>("/studio/generate", {
+    method: "POST",
+    body: { feature: "parent_update", classId, prompt: note ?? "", student },
+    timeoutMs: 90_000,
+  });
+}
+
 export function unreadMaterialsNotice(result: GenerationResult): string | undefined {
   const count = result.unread_materials?.length ?? 0;
   if (count === 0) return undefined;
