@@ -164,6 +164,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     ],
   },
   {
+    id: "student-access",
+    title: "Students can sign in and read shared notes",
+    period: "Completed",
+    status: "done",
+    summary:
+      "Invite-only student accounts, and a switch on each note in Notes & text that decides whether the students of that class can read it.",
+    items: [
+      "A teacher hands over a single-use join code; nobody can register without one, and redeeming it is the only way to become a student",
+      "Sharing is per class, not per note — the same note can be open to one class and closed to another",
+      "The first non-owner read path in the database, proven against the live schema: a student sees a shared note in their own class and nothing else, and teachers are unaffected",
+    ],
+  },
+  {
     id: "full-redesign",
     title: "Full site redesign",
     period: "Target: Sun, 20 Sep 2026",

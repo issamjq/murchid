@@ -412,6 +412,10 @@ export interface MaterialRow {
   // Set when the material came from an uploaded file rather than typed
   // text: body_md then holds what the backend read out of that file.
   storage_path: string | null;
+  // Per-class, not per-material: it lives on the class_materials join, so
+  // the same note can be visible to one class and not another. Carried on
+  // this row because listMaterialsForClass is already class-scoped.
+  visible_to_students: boolean;
 }
 
 export async function listMaterialsForClass(classId: string): Promise<MaterialRow[]> {
@@ -419,11 +423,30 @@ export async function listMaterialsForClass(classId: string): Promise<MaterialRo
   const { data, error } = await db
     .from("class_materials")
     .select(
-      "material:materials(id, title, kind, body_md, created_at, owner_id, is_shared, storage_path)",
+      "visible_to_students, material:materials(id, title, kind, body_md, created_at, owner_id, is_shared, storage_path)",
     )
     .eq("class_id", classId);
   if (error) throw error;
-  return ((data ?? []) as unknown as { material: MaterialRow }[]).map((l) => l.material);
+  const rows = (data ?? []) as unknown as {
+    visible_to_students: boolean;
+    material: Omit<MaterialRow, "visible_to_students">;
+  }[];
+  return rows.map((l) => ({ ...l.material, visible_to_students: l.visible_to_students }));
+}
+
+/** Switches a note on or off for the students of one class. */
+export async function setMaterialVisibleToStudents(
+  classId: string,
+  materialId: string,
+  visible: boolean,
+): Promise<void> {
+  const db = requireClient();
+  const { error } = await db
+    .from("class_materials")
+    .update({ visible_to_students: visible })
+    .eq("class_id", classId)
+    .eq("material_id", materialId);
+  if (error) throw error;
 }
 
 export async function updateMaterial(
@@ -635,13 +658,16 @@ export interface StudentRow {
   roll_no: string | null;
   email: string | null;
   status: "invited" | "active" | "removed";
+  // The code the student redeems at /student/join to get an account.
+  // Null once redeemed — it is single-use.
+  invite_code: string | null;
 }
 
 export async function listClassStudents(classId: string): Promise<StudentRow[]> {
   const db = requireClient();
   const { data, error } = await db
     .from("class_members")
-    .select("student:students(id, name, roll_no, email, status)")
+    .select("student:students(id, name, roll_no, email, status, invite_code)")
     .eq("class_id", classId);
   if (error) throw error;
   return ((data ?? []) as unknown as { student: StudentRow }[]).map((r) => r.student);

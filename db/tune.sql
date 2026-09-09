@@ -8,6 +8,11 @@
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   role text not null default 'teacher' check (role in ('teacher','sub_admin','super_admin','organisation')),
+  -- 'student' was added after this table already existed live, so the
+  -- inline check above is superseded by the re-added constraint below.
+  -- Students never reach this table by signing up — handle_new_user()
+  -- makes every signup a pending teacher, and claim_student_invite()
+  -- corrects the row once a real invite code is redeemed.
   status text not null default 'pending' check (status in ('pending','active','rejected')),
   name text,
   email text,
@@ -19,6 +24,14 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles enable row level security;
+
+-- Widen the role vocabulary to include 'student'. Dropped and re-added
+-- rather than edited in place, since the table already exists live; the
+-- name is the one Postgres generated for the inline check (verified
+-- against the live catalog, not assumed).
+alter table public.profiles drop constraint if exists profiles_role_check;
+alter table public.profiles add constraint profiles_role_check
+  check (role in ('teacher','sub_admin','super_admin','organisation','student'));
 
 -- Single-device enforcement: a second sign-in supersedes the first.
 -- claim_session() is called by the frontend right after a genuine
@@ -200,6 +213,16 @@ create table if not exists public.students (
   created_at timestamptz not null default now()
 );
 
+-- Invite-only, per docs/00-concept.md: nobody self-registers as a student.
+-- The teacher hands this code over however they already talk to the class
+-- (there is no email transport in this product), the student redeems it at
+-- /student/join, and claim_student_invite() nulls it — single use. The
+-- default is generated in the database so a code is never client-chosen.
+alter table public.students add column if not exists invite_code text
+  default upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
+create unique index if not exists students_invite_code_key
+  on public.students (invite_code) where invite_code is not null;
+
 create table if not exists public.class_members (
   class_id uuid not null references public.classes(id) on delete cascade,
   student_id uuid not null references public.students(id) on delete cascade,
@@ -230,6 +253,13 @@ create table if not exists public.class_materials (
   created_at timestamptz not null default now(),
   primary key (class_id, material_id)
 );
+-- "My students in THIS class can read this note." Deliberately on the join
+-- rather than on materials: one note can be attached to several classes,
+-- and sharing it with Grade 9 Physics shouldn't publish it to every other
+-- class it happens to be attached to. Not to be confused with
+-- materials.is_shared, which means the platform-wide admin library.
+alter table public.class_materials
+  add column if not exists visible_to_students boolean not null default false;
 
 -- Doubts anchored to a position in a material; an approved answer becomes
 -- visible to the whole class, not just the asking student.
@@ -824,3 +854,132 @@ drop policy if exists "owner full access" on public.parent_updates;
 create policy "owner full access" on public.parent_updates for all
   using (owner_id = auth.uid() and public.session_ok())
   with check (owner_id = auth.uid() and public.session_ok());
+
+-- ══ Students: redeeming an invite, and the first non-owner read path ══
+--
+-- Everything above this line is `owner_id = auth.uid()` or `is_admin()`.
+-- What follows is the only way a non-owner reads a teacher's rows, so it
+-- is deliberately narrow: a student sees a note only when their own
+-- claimed account is a member of a class the teacher has explicitly
+-- flagged that note visible in.
+
+-- Redeeming a code does two writes a student cannot do themselves — the
+-- students row belongs to the teacher, and role is not self-assignable —
+-- so it bypasses RLS, exactly like claim_session() above. It validates
+-- the code rather than trusting the caller, and nulls it on success so a
+-- code cannot be redeemed twice.
+create or replace function public.claim_student_invite(code text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_id uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not signed in' using errcode = '42501';
+  end if;
+
+  select id into target_id
+  from public.students
+  where invite_code = upper(trim(code))
+    and auth_user_id is null
+    and status = 'invited'
+  for update;
+
+  if target_id is null then
+    raise exception 'that invite code is not valid, or has already been used'
+      using errcode = 'P0001';
+  end if;
+
+  update public.students
+  set auth_user_id = auth.uid(),
+      status = 'active',
+      invite_code = null
+  where id = target_id;
+
+  -- handle_new_user() made this a pending teacher on signup; correct it.
+  update public.profiles
+  set role = 'student', status = 'active', updated_at = now()
+  where id = auth.uid();
+end;
+$$;
+revoke all on function public.claim_student_invite(text) from public, anon;
+grant execute on function public.claim_student_invite(text) to authenticated;
+
+-- Resolves the caller to their own students row. Its own SELECT policy
+-- would otherwise be circular, and every policy below needs the answer.
+create or replace function public.current_student_id()
+returns uuid
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select id from public.students
+  where auth_user_id = auth.uid() and status = 'active'
+  limit 1;
+$$;
+revoke all on function public.current_student_id() from public, anon;
+grant execute on function public.current_student_id() to authenticated;
+
+-- A student reads their own row (name, to greet them by) and nothing else.
+drop policy if exists "student reads own record" on public.students;
+create policy "student reads own record" on public.students
+  for select using (
+    auth_user_id = auth.uid() and public.session_ok()
+  );
+
+-- …their own enrolment rows. Not cosmetic: RLS applies to tables named
+-- inside a policy's own subqueries too, so without this every EXISTS on
+-- class_members below silently matches nothing and a student sees an
+-- empty portal. Found by testing the policies rather than reading them.
+drop policy if exists "student reads own membership" on public.class_members;
+create policy "student reads own membership" on public.class_members
+  for select using (
+    class_members.student_id = public.current_student_id()
+    and public.session_ok()
+  );
+
+-- …the classes they're enrolled in, so notes can be grouped by subject.
+drop policy if exists "student reads own classes" on public.classes;
+create policy "student reads own classes" on public.classes
+  for select using (
+    public.session_ok()
+    and exists (
+      select 1 from public.class_members mem
+      where mem.class_id = classes.id
+        and mem.student_id = public.current_student_id()
+    )
+  );
+
+-- …the attachments their teacher has flagged visible in those classes…
+drop policy if exists "student reads visible class materials" on public.class_materials;
+create policy "student reads visible class materials" on public.class_materials
+  for select using (
+    class_materials.visible_to_students = true
+    and public.session_ok()
+    and exists (
+      select 1 from public.class_members mem
+      where mem.class_id = class_materials.class_id
+        and mem.student_id = public.current_student_id()
+    )
+  );
+
+-- …and the note behind each one. With auth_user_id unset everywhere,
+-- current_student_id() is NULL and every EXISTS above is false, so these
+-- policies grant nothing until a real invite is actually redeemed.
+drop policy if exists "student reads visible materials" on public.materials;
+create policy "student reads visible materials" on public.materials
+  for select using (
+    public.session_ok()
+    and exists (
+      select 1
+      from public.class_materials cm
+      join public.class_members mem on mem.class_id = cm.class_id
+      where cm.material_id = materials.id
+        and cm.visible_to_students = true
+        and mem.student_id = public.current_student_id()
+    )
+  );

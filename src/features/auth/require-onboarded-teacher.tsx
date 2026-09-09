@@ -28,6 +28,10 @@ export function RequireOnboardedTeacher({
       router.replace("/organisation");
       return;
     }
+    if (user.role === "student") {
+      router.replace("/student");
+      return;
+    }
     if (!isOnboarded(user)) {
       router.replace("/onboarding/teacher");
     }
@@ -39,6 +43,7 @@ export function RequireOnboardedTeacher({
     user.role === "super_admin" ||
     user.role === "sub_admin" ||
     user.role === "organisation" ||
+    user.role === "student" ||
     !isOnboarded(user)
   ) {
     return (

@@ -33,7 +33,9 @@ export default function ClassStudentsPage() {
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6 md:p-8">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Invite-only — a student needs an invite to get a login.
+          Invite-only. Give a student their join code and they can sign up at{" "}
+          <code className="rounded bg-secondary px-1 py-0.5 font-mono text-xs">/student/join</code>{" "}
+          — nobody can register without one.
         </p>
         <InviteStudentButton classId={classId} onInvited={refresh} />
       </div>
@@ -52,6 +54,7 @@ export default function ClassStudentsPage() {
               <TableHead>Roll no.</TableHead>
               <TableHead>Student</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Join code</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -61,6 +64,15 @@ export default function ClassStudentsPage() {
                 <TableCell className="font-medium">{s.name}</TableCell>
                 <TableCell>
                   <StatusPill status={s.status === "removed" ? "rejected" : s.status === "active" ? "active" : "pending"} />
+                </TableCell>
+                <TableCell>
+                  {s.invite_code ? (
+                    <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs tracking-wider">
+                      {s.invite_code}
+                    </code>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Signed in</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

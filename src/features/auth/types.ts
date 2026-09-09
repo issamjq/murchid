@@ -1,4 +1,4 @@
-export type Role = "teacher" | "sub_admin" | "super_admin" | "organisation";
+export type Role = "teacher" | "sub_admin" | "super_admin" | "organisation" | "student";
 export type ApprovalStatus = "pending" | "active" | "rejected";
 
 export interface SessionUser {

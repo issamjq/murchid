@@ -1,21 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { FileUp, Pencil, Trash2 } from "lucide-react";
+import { Eye, EyeOff, FileUp, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { deleteMaterial, updateMaterial, type MaterialRow } from "@/lib/data/classes";
+import {
+  deleteMaterial,
+  setMaterialVisibleToStudents,
+  updateMaterial,
+  type MaterialRow,
+} from "@/lib/data/classes";
 
 export function MaterialCard({
   material,
+  classId,
   canManage,
   onOpen,
   onChanged,
 }: {
   material: MaterialRow;
+  classId: string;
   canManage: boolean;
   onOpen: () => void;
   onChanged: () => void;
@@ -25,6 +32,29 @@ export function MaterialCard({
   const [bodyMd, setBodyMd] = useState(material.body_md ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [visible, setVisible] = useState(material.visible_to_students);
+
+  // An uploaded file has no reader anywhere in the app yet — not even for
+  // the teacher who owns it. Sharing one would give a student a title and
+  // nothing to open, so the switch says why instead of pretending.
+  const isFileOnly = !material.body_md?.trim() && !!material.storage_path;
+
+  async function toggleVisibility() {
+    if (busy || isFileOnly) return;
+    const next = !visible;
+    setBusy(true);
+    setError(null);
+    setVisible(next);
+    try {
+      await setMaterialVisibleToStudents(classId, material.id, next);
+      onChanged();
+    } catch (e) {
+      setVisible(!next);
+      setError(e instanceof Error ? e.message : "Couldn't change who can see this.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function save() {
     if (!title.trim() || busy) return;
@@ -103,9 +133,35 @@ export function MaterialCard({
               <FileUp className="size-3" /> Uploaded file
             </p>
           ) : null}
+          {visible ? (
+            <p className="flex items-center gap-1 text-xs text-success">
+              <Eye className="size-3" /> Students in this class can read this
+            </p>
+          ) : null}
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {canManage ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={busy || isFileOnly}
+              aria-label={
+                visible ? `Hide ${material.title} from students` : `Show ${material.title} to students`
+              }
+              title={
+                isFileOnly
+                  ? "Uploaded files can't be shared yet — there's no reader for them"
+                  : visible
+                    ? "Visible to students in this class — click to hide"
+                    : "Hidden from students — click to share with this class"
+              }
+              className={visible ? "text-success hover:text-success" : "text-muted-foreground"}
+              onClick={toggleVisibility}
+            >
+              {visible ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+            </Button>
+          ) : null}
           {canManage ? (
             // Revealed on hover from md up; always there on touch, which
             // has no hover to reveal them with.

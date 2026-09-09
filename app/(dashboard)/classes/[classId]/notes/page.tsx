@@ -60,6 +60,7 @@ export default function ClassNotesPage() {
               <MaterialCard
                 key={n.id}
                 material={n}
+                classId={classId}
                 canManage={n.owner_id === user?.id && !n.is_shared}
                 onOpen={() => open({ title: n.title, kind: "Note", content: n.body_md })}
                 onChanged={refresh}
