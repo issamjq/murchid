@@ -8,6 +8,8 @@ export interface StudioItem {
   classLabel?: string;
   /** The real generated markdown, when there is one to show. */
   content?: string | null;
+  /** The class materials this draft was grounded in, when recorded. */
+  sources?: { id: string; title: string }[] | null;
 }
 
 interface StudioContextValue {

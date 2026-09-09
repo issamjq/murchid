@@ -134,12 +134,23 @@ export type GoalItemKind =
   | "activity"
   | "homework";
 
+/** The materials a draft was grounded in — document-level provenance. */
+export interface GroundedSource {
+  id: string;
+  title: string;
+}
+
+export interface ArtifactContent {
+  markdown: string;
+  groundedOn?: GroundedSource[];
+}
+
 export interface GoalItemRow {
   id: string;
   kind: GoalItemKind;
   title: string;
   detail: string | null;
-  content: { markdown: string } | null;
+  content: ArtifactContent | null;
   scheduled_for: string | null;
   created_at: string;
   // Null = the standard/core version. Set on a sibling item created
@@ -241,14 +252,39 @@ export async function listScheduledForDate(
   return items;
 }
 
+/** What a generation drew on, for the "Grounded in" list on the draft.
+ *
+ * Prefers the backend's own answer once it reports one (todo/backend/16).
+ * Until then it computes the same set the backend's spec says it
+ * concatenates: the class's attached materials that have readable text. A
+ * material with a storage_path but no body_md is exactly what the backend
+ * already reports as unread, so excluding those matches its behaviour. The
+ * one thing this can't see is the backend's prompt-budget cap silently
+ * dropping a material — which is why the real list is worth returning. */
+export async function resolveGroundedOn(
+  result: { grounded_on?: GroundedSource[] },
+  classId: string,
+): Promise<GroundedSource[]> {
+  if (result.grounded_on) return result.grounded_on;
+  const materials = await listMaterialsForClass(classId);
+  return materials
+    .filter((m) => (m.body_md ?? "").trim().length > 0)
+    .map((m) => ({ id: m.id, title: m.title }));
+}
+
+function artifactContent(markdown: string, groundedOn: GroundedSource[]): ArtifactContent {
+  return groundedOn.length > 0 ? { markdown, groundedOn } : { markdown };
+}
+
 export async function createGoalItemFromPrompt(
   ownerId: string,
   classId: string,
   kind: GoalItemKind,
   prompt: string,
-  generated: { title: string; content: string },
+  generated: { title: string; content: string; grounded_on?: GroundedSource[] },
 ): Promise<GoalItemRow> {
   const db = requireClient();
+  const groundedOn = await resolveGroundedOn(generated, classId);
   const { data: goal, error: goalError } = await db
     .from("goals")
     .insert({ owner_id: ownerId, class_id: classId, prompt, source: "prompt", status: "draft" })
@@ -263,7 +299,7 @@ export async function createGoalItemFromPrompt(
       goal_id: goal.id,
       kind,
       title: generated.title,
-      content: { markdown: generated.content },
+      content: artifactContent(generated.content, groundedOn),
     })
     .select()
     .single();
@@ -282,6 +318,7 @@ export async function createTieredGoalItemsFromPrompt(
   result: GenerationResult,
 ): Promise<GoalItemRow[]> {
   const db = requireClient();
+  const groundedOn = await resolveGroundedOn(result, classId);
   const { data: goal, error: goalError } = await db
     .from("goals")
     .insert({ owner_id: ownerId, class_id: classId, prompt, source: "prompt", status: "draft" })
@@ -304,7 +341,7 @@ export async function createTieredGoalItemsFromPrompt(
         goal_id: goal.id,
         kind,
         title: r.title,
-        content: { markdown: r.content },
+        content: artifactContent(r.content, groundedOn),
         tier: r.tier,
       })),
     )
@@ -319,7 +356,7 @@ export interface AssessmentRow {
   kind: "quiz" | "exam";
   title: string;
   status: "draft" | "scheduled";
-  content: { markdown: string } | null;
+  content: ArtifactContent | null;
   scheduled_for: string | null;
   created_at: string;
 }
@@ -343,9 +380,10 @@ export async function createAssessmentFromPrompt(
   ownerId: string,
   classId: string,
   kind: "quiz" | "exam",
-  generated: { title: string; content: string },
+  generated: { title: string; content: string; grounded_on?: GroundedSource[] },
 ): Promise<AssessmentRow> {
   const db = requireClient();
+  const groundedOn = await resolveGroundedOn(generated, classId);
   const { data, error } = await db
     .from("assessments")
     .insert({
@@ -353,7 +391,7 @@ export async function createAssessmentFromPrompt(
       class_id: classId,
       kind,
       title: generated.title,
-      content: { markdown: generated.content },
+      content: artifactContent(generated.content, groundedOn),
       status: "draft",
     })
     .select()

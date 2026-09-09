@@ -70,7 +70,12 @@ export default function ClassExamsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        open({ title: e.title, kind: "Exam", content: e.content?.markdown })
+                        open({
+                          title: e.title,
+                          kind: "Exam",
+                          content: e.content?.markdown,
+                          sources: e.content?.groundedOn,
+                        })
                       }
                     >
                       Review

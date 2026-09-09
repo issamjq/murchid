@@ -75,7 +75,12 @@ export default function ClassLessonsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        open({ title: l.title, kind: "Lesson", content: l.content?.markdown })
+                        open({
+                          title: l.title,
+                          kind: "Lesson",
+                          content: l.content?.markdown,
+                          sources: l.content?.groundedOn,
+                        })
                       }
                     >
                       Open in Studio

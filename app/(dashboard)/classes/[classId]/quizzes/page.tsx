@@ -70,7 +70,12 @@ export default function ClassQuizzesPage() {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        open({ title: q.title, kind: "Quiz", content: q.content?.markdown })
+                        open({
+                          title: q.title,
+                          kind: "Quiz",
+                          content: q.content?.markdown,
+                          sources: q.content?.groundedOn,
+                        })
                       }
                     >
                       Review

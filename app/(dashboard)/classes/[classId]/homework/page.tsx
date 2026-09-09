@@ -100,7 +100,12 @@ export default function ClassHomeworkPage() {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        open({ title: h.title, kind: "Homework", content: h.content?.markdown })
+                        open({
+                          title: h.title,
+                          kind: "Homework",
+                          content: h.content?.markdown,
+                          sources: h.content?.groundedOn,
+                        })
                       }
                     >
                       Open

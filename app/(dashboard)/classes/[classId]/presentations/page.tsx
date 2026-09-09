@@ -75,7 +75,12 @@ export default function ClassPresentationsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        open({ title: p.title, kind: "Presentation", content: p.content?.markdown })
+                        open({
+                          title: p.title,
+                          kind: "Presentation",
+                          content: p.content?.markdown,
+                          sources: p.content?.groundedOn,
+                        })
                       }
                     >
                       Open

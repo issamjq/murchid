@@ -75,7 +75,12 @@ export default function ClassActivitiesPage() {
                       variant="outline"
                       size="sm"
                       onClick={() =>
-                        open({ title: a.title, kind: "Activity", content: a.content?.markdown })
+                        open({
+                          title: a.title,
+                          kind: "Activity",
+                          content: a.content?.markdown,
+                          sources: a.content?.groundedOn,
+                        })
                       }
                     >
                       Open

@@ -22,6 +22,10 @@ export interface GenerationResult {
   // absence (when additionalTiers was sent) means "not built yet", not
   // an error. See createTieredGoalItemsFromPrompt in lib/data/classes.ts.
   additional?: Partial<Record<Tier, { title: string; content: string }>>;
+  // The materials this draft was actually grounded in, once the backend
+  // reports them (todo/backend/16). Until then resolveGroundedOn() in
+  // lib/data/classes.ts computes the same set client-side.
+  grounded_on?: { id: string; title: string }[];
 }
 
 export function generateContent(

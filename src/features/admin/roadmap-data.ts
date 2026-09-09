@@ -112,6 +112,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     ],
   },
   {
+    id: "grounded-sources",
+    title: "Every draft shows what it was grounded in",
+    period: "Completed",
+    status: "done",
+    summary:
+      "A generated lesson, quiz or worksheet now records which of the class's reference materials it drew on, shown under the draft when you open it.",
+    items: [
+      "Works today by resolving the same material set the backend grounds on; defers to the backend's own list the moment it starts sending one",
+      "Stored alongside the draft, so it's still there when the record is reopened weeks later",
+      "Backend spec for the exact list (after its prompt-budget cap) — todo/backend/16-grounded-sources-spec.md",
+    ],
+  },
+  {
     id: "full-redesign",
     title: "Full site redesign",
     period: "Target: Sun, 20 Sep 2026",

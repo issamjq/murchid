@@ -81,6 +81,21 @@ function Dialog({ item, onClose }: { item: StudioItem; onClose: () => void }) {
               Nothing is saved in this {item.kind.toLowerCase()} yet.
             </p>
           )}
+
+          {item.sources && item.sources.length > 0 ? (
+            <div className="mx-auto mt-8 max-w-[70ch] border-t border-border pt-4">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Grounded in
+              </p>
+              <ul className="mt-2 space-y-1">
+                {item.sources.map((source) => (
+                  <li key={source.id} className="text-sm text-muted-foreground">
+                    {source.title}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
