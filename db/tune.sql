@@ -402,10 +402,24 @@ create policy "insert own materials, shared requires admin role" on public.mater
       or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('super_admin','sub_admin'))
     )
   );
+-- The with-check mirrors the insert policy above on purpose. Without it a
+-- teacher could `update materials set is_shared = true` on their own row
+-- and publish into the library every signed-in teacher reads — the insert
+-- rule says admins-only, and RLS is the whole authorization boundary here,
+-- so the update path has to say the same thing. No UI ever flipped this
+-- flag; shared rows belong to the admin who created them, so admins can
+-- still edit and unpublish their own.
 drop policy if exists "update own materials" on public.materials;
 create policy "update own materials" on public.materials
   for update using (owner_id = auth.uid() and public.session_ok())
-  with check (owner_id = auth.uid() and public.session_ok());
+  with check (
+    owner_id = auth.uid()
+    and public.session_ok()
+    and (
+      is_shared = false
+      or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('super_admin','sub_admin'))
+    )
+  );
 drop policy if exists "delete own materials" on public.materials;
 create policy "delete own materials" on public.materials
   for delete using (owner_id = auth.uid() and public.session_ok());

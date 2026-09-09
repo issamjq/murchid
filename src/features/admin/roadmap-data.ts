@@ -138,6 +138,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     ],
   },
   {
+    id: "library-copy",
+    title: "Copy shared material to adapt it",
+    period: "Completed",
+    status: "done",
+    summary:
+      "Pulling someone else's syllabus into your class used to attach it read-only. You can now take an editable copy — and a permissions hole that let any teacher publish into the shared library has been closed.",
+    items: [
+      "\"Copy\" alongside the existing \"Add\" in Choose from deck; a file with no text says so rather than pretending to copy",
+      "Closed an RLS gap: the update policy didn't guard is_shared, so a teacher could publish to the platform-wide library the insert rule reserves for admins",
+      "Still open, and a product decision rather than a build: shared material is global-or-private, with no school/organisation scoping modelled at all",
+    ],
+  },
+  {
     id: "full-redesign",
     title: "Full site redesign",
     period: "Target: Sun, 20 Sep 2026",

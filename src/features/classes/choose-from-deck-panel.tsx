@@ -10,6 +10,7 @@ import { SYLLABUS_TYPES } from "@/features/onboarding/uae-institutions";
 import {
   listSharedMaterials,
   attachExistingMaterial,
+  copySharedMaterialToClass,
   type SharedMaterialRow,
 } from "@/lib/data/library";
 
@@ -27,6 +28,8 @@ export function ChooseFromDeckList({
   const [subject, setSubject] = useState("");
   const [results, setResults] = useState<SharedMaterialRow[] | null>(null);
   const [attaching, setAttaching] = useState<string | null>(null);
+  const [copying, setCopying] = useState<string | null>(null);
+  const [noText, setNoText] = useState<string | null>(null);
 
   useEffect(() => {
     listSharedMaterials({
@@ -43,6 +46,18 @@ export function ChooseFromDeckList({
       onAttached();
     } finally {
       setAttaching(null);
+    }
+  }
+
+  async function copy(materialId: string) {
+    setCopying(materialId);
+    setNoText(null);
+    try {
+      const result = await copySharedMaterialToClass(ownerId, classId, materialId);
+      if (result.copied) onAttached();
+      else setNoText(materialId);
+    } finally {
+      setCopying(null);
     }
   }
 
@@ -86,26 +101,41 @@ export function ChooseFromDeckList({
       ) : (
         <div className="max-h-64 space-y-2 overflow-y-auto">
           {results.map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center justify-between rounded-md border border-border px-3 py-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{r.title}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {[r.syllabus, r.grade_level ? `Grade ${r.grade_level}` : null, r.subject]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
+            <div key={r.id} className="rounded-md border border-border px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{r.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[r.syllabus, r.grade_level ? `Grade ${r.grade_level}` : null, r.subject]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={attaching === r.id}
+                    onClick={() => attach(r.id)}
+                  >
+                    {attaching === r.id ? "Adding…" : "Add"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={copying === r.id}
+                    title="Pull in an editable copy you can adapt"
+                    onClick={() => copy(r.id)}
+                  >
+                    {copying === r.id ? "Copying…" : "Copy"}
+                  </Button>
+                </div>
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={attaching === r.id}
-                onClick={() => attach(r.id)}
-              >
-                {attaching === r.id ? "Adding…" : "Add"}
-              </Button>
+              {noText === r.id ? (
+                <p className="mt-1.5 text-xs text-warning">
+                  Nothing to copy — this one&apos;s a file. Use Add to attach it.
+                </p>
+              ) : null}
             </div>
           ))}
         </div>
