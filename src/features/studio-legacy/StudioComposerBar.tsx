@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Paperclip, Sparkles, X } from "lucide-react";
+import { Mic, MicOff, Paperclip, Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { logGeneration } from "@/lib/data/analytics";
 import { ComposerAttachMenu } from "./ComposerAttachMenu";
+import { useDictation } from "./use-dictation";
 
 export function StudioComposerBar({
   placeholder,
@@ -40,6 +41,12 @@ export function StudioComposerBar({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
+
+  // Dictated text is appended, not substituted — a teacher may type half a
+  // brief and say the rest.
+  const dictation = useDictation((text) =>
+    setPrompt((current) => (current.trim() ? `${current.trim()} ${text}` : text)),
+  );
 
   function toggleTier(key: string) {
     setSelectedTiers((prev) =>
@@ -111,6 +118,23 @@ export function StudioComposerBar({
         >
           {attachOpen ? <X className="size-4" /> : <Paperclip className="size-4" />}
         </Button>
+        {dictation.supported ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={dictation.toggle}
+            aria-label={dictation.listening ? "Stop dictating" : "Dictate"}
+            title="Dictate — your browser does the transcription, and may send audio to its speech service"
+            className={`shrink-0 rounded-full ${
+              dictation.listening
+                ? "text-destructive hover:text-destructive"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {dictation.listening ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+          </Button>
+        ) : null}
         <Textarea
           rows={1}
           placeholder={placeholder}
@@ -143,7 +167,14 @@ export function StudioComposerBar({
           )}
         </p>
       ) : null}
-      {error ? <p className="px-1 text-xs text-destructive">{error}</p> : null}
+      {dictation.interim ? (
+        <p className="px-1 text-xs italic text-muted-foreground">
+          Hearing: {dictation.interim}
+        </p>
+      ) : null}
+      {error ?? dictation.error ? (
+        <p className="px-1 text-xs text-destructive">{error ?? dictation.error}</p>
+      ) : null}
       {notice ? <p className="px-1 text-xs text-warning">{notice}</p> : null}
     </div>
   );

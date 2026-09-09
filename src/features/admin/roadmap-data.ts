@@ -151,6 +151,19 @@ export const ROADMAP: RoadmapCheckpoint[] = [
     ],
   },
   {
+    id: "dictation",
+    title: "Dictate a brief instead of typing it",
+    period: "Completed",
+    status: "done",
+    summary:
+      "A mic button on the studio composer — describe what you want out loud and it lands in the prompt box. Covers all seven generation tabs at once.",
+    items: [
+      "Uses the browser's own speech recognition — no new dependency, no backend, nothing extra to run",
+      "Only settled text is inserted; the browser's live guesses show separately so nothing arrives duplicated",
+      "In a browser without the API the button simply isn't there, rather than being there and doing nothing",
+    ],
+  },
+  {
     id: "full-redesign",
     title: "Full site redesign",
     period: "Target: Sun, 20 Sep 2026",
