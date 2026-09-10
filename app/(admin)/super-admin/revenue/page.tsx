@@ -34,7 +34,7 @@ export default function SuperAdminRevenuePage() {
     <div>
       <PageHeader
         title="Revenue"
-        description="Real subscription rows — checkout isn't wired up yet, so this reads zero until the backend's Stripe webhook starts writing them."
+        description="Real subscription rows — the backend's checkout and webhook are built, but no teacher-facing upgrade UI calls them yet, so this reads zero until one does."
       />
       <div className="space-y-6 p-6 md:p-8">
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -48,7 +48,7 @@ export default function SuperAdminRevenuePage() {
           <EmptyState
             icon={DollarSign}
             title="No subscriptions yet"
-            description="Checkout and the Stripe webhook that writes this table aren't built yet — see todo/backend/12-billing-spec.md. Every account is implicitly on the free plan until then."
+            description="No teacher-facing 'Upgrade to Pro' exists to call checkout yet — see todo/backend/00-open.md §5. Every account is implicitly on the free plan until then."
           />
         ) : (
           <Card>

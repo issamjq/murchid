@@ -81,7 +81,7 @@ route exists; the pinger is an ops task), extraction, and the whole
 phase 0–5 chain. What remains from this file:
 
 - **`POST /api/studio/skill-profile`** and assignment-aware
-  `skill_ids` — [backend/08-skills-refinement.md](backend/08-skills-refinement.md).
+  `skill_ids` — [backend/00-open.md](backend/00-open.md) §3.
 - **Per-field confidence in `/api/onboarding/parse`** — the funnel wants
   to flag low-confidence auto-filled fields for review; today it only
   gets the `found`/`missing` split. Cosmetic, and the reason it has
