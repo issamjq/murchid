@@ -395,22 +395,60 @@ alter table public.assessments enable row level security;
 alter table public.results enable row level security;
 alter table public.attendance enable row level security;
 
+-- Batch/grade/division/class used to be `for all` (select+insert+update+
+-- delete in one policy). Split per-command with delete deliberately
+-- omitted: once created, a batch/grade/division/class can't be removed —
+-- the UI dropped its delete buttons, and RLS is the real authorization
+-- boundary here (see CLAUDE.md), so the policy has to say the same thing
+-- or a direct Supabase call would still get through.
 drop policy if exists "owner full access" on public.batches;
-create policy "owner full access" on public.batches for all
+drop policy if exists "select own batches" on public.batches;
+create policy "select own batches" on public.batches for select
+  using (owner_id = auth.uid() and public.session_ok());
+drop policy if exists "insert own batches" on public.batches;
+create policy "insert own batches" on public.batches for insert
+  with check (owner_id = auth.uid() and public.session_ok());
+drop policy if exists "update own batches" on public.batches;
+create policy "update own batches" on public.batches for update
   using (owner_id = auth.uid() and public.session_ok())
   with check (owner_id = auth.uid() and public.session_ok());
+
 drop policy if exists "owner full access" on public.grades;
-create policy "owner full access" on public.grades for all
+drop policy if exists "select own grades" on public.grades;
+create policy "select own grades" on public.grades for select
+  using (owner_id = auth.uid() and public.session_ok());
+drop policy if exists "insert own grades" on public.grades;
+create policy "insert own grades" on public.grades for insert
+  with check (owner_id = auth.uid() and public.session_ok());
+drop policy if exists "update own grades" on public.grades;
+create policy "update own grades" on public.grades for update
   using (owner_id = auth.uid() and public.session_ok())
   with check (owner_id = auth.uid() and public.session_ok());
+
 drop policy if exists "owner full access" on public.divisions;
-create policy "owner full access" on public.divisions for all
+drop policy if exists "select own divisions" on public.divisions;
+create policy "select own divisions" on public.divisions for select
+  using (owner_id = auth.uid() and public.session_ok());
+drop policy if exists "insert own divisions" on public.divisions;
+create policy "insert own divisions" on public.divisions for insert
+  with check (owner_id = auth.uid() and public.session_ok());
+drop policy if exists "update own divisions" on public.divisions;
+create policy "update own divisions" on public.divisions for update
   using (owner_id = auth.uid() and public.session_ok())
   with check (owner_id = auth.uid() and public.session_ok());
+
 drop policy if exists "owner full access" on public.classes;
-create policy "owner full access" on public.classes for all
+drop policy if exists "select own classes" on public.classes;
+create policy "select own classes" on public.classes for select
+  using (owner_id = auth.uid() and public.session_ok());
+drop policy if exists "insert own classes" on public.classes;
+create policy "insert own classes" on public.classes for insert
+  with check (owner_id = auth.uid() and public.session_ok());
+drop policy if exists "update own classes" on public.classes;
+create policy "update own classes" on public.classes for update
   using (owner_id = auth.uid() and public.session_ok())
   with check (owner_id = auth.uid() and public.session_ok());
+
 drop policy if exists "owner full access" on public.class_materials;
 create policy "owner full access" on public.class_materials for all
   using (owner_id = auth.uid() and public.session_ok())
@@ -450,9 +488,11 @@ create policy "update own materials" on public.materials
       or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('super_admin','sub_admin'))
     )
   );
+-- No delete policy for materials: once created — including a document
+-- added to the shared library — it can't be removed, by the same
+-- teacher, an admin, or a direct Supabase call. The UI dropped its
+-- delete/remove buttons; this is what actually enforces it.
 drop policy if exists "delete own materials" on public.materials;
-create policy "delete own materials" on public.materials
-  for delete using (owner_id = auth.uid() and public.session_ok());
 drop policy if exists "owner full access" on public.doubts;
 create policy "owner full access" on public.doubts for all
   using (owner_id = auth.uid() and public.session_ok())

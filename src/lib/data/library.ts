@@ -150,9 +150,3 @@ export async function createSharedMaterial(
   if (error) throw error;
   return data as SharedMaterialRow;
 }
-
-export async function deleteSharedMaterial(id: string): Promise<void> {
-  const db = requireClient();
-  const { error } = await db.from("materials").delete().eq("id", id);
-  if (error) throw error;
-}

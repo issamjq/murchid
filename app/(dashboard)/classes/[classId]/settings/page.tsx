@@ -1,23 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useClassesRefresh } from "@/features/classes/classes-refresh-context";
-import {
-  getClassWithPath,
-  updateClass,
-  deleteClass,
-  type ClassWithPath,
-} from "@/lib/data/classes";
+import { getClassWithPath, updateClass, type ClassWithPath } from "@/lib/data/classes";
 
 export default function ClassSettingsPage() {
   const { classId } = useParams<{ classId: string }>();
-  const router = useRouter();
   const { bump } = useClassesRefresh();
   const [cls, setCls] = useState<ClassWithPath | null | undefined>(undefined);
   const [subject, setSubject] = useState("");
@@ -56,18 +50,6 @@ export default function ClassSettingsPage() {
     bump();
   }
 
-  async function removeClass() {
-    if (
-      !confirm(
-        `Delete "${cls?.subject}"? This removes its lessons, notes, exams, quizzes, results, and attendance, and removes access for every enrolled student.`,
-      )
-    )
-      return;
-    await deleteClass(classId);
-    bump();
-    router.push("/classes");
-  }
-
   return (
     <div className="min-h-0 max-w-xl flex-1 space-y-6 overflow-y-auto p-6 md:p-8">
       <Card>
@@ -98,22 +80,6 @@ export default function ClassSettingsPage() {
               {saving ? "Saving…" : "Save changes"}
             </Button>
             {saved ? <span className="text-xs text-success">Saved</span> : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-destructive/40">
-        <CardHeader>
-          <CardTitle className="text-destructive">Danger zone</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Removing this class removes access for every enrolled student.
-            </p>
-            <Button variant="destructive" size="sm" onClick={removeClass}>
-              Delete class
-            </Button>
           </div>
         </CardContent>
       </Card>

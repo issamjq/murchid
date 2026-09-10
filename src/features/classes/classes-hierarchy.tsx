@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Pencil, Trash2, Check, X, School } from "lucide-react";
+import { Pencil, Check, X, School } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -12,7 +12,7 @@ import { useClassesRefresh } from "@/features/classes/classes-refresh-context";
 import { GradeSection } from "./class-tree-editor";
 import { AddBatchForm, AddGradeForm } from "./class-tree-forms";
 import { IconButton } from "./icon-button";
-import { listHierarchy, updateBatch, deleteBatch, type BatchRow } from "@/lib/data/classes";
+import { listHierarchy, updateBatch, type BatchRow } from "@/lib/data/classes";
 
 export function ClassesHierarchy() {
   const { user } = useSession();
@@ -84,12 +84,7 @@ export function ClassesHierarchy() {
                 ))}
               </TabsList>
               {currentBatch ? (
-                <BatchActions
-                  key={currentBatch.id}
-                  batch={currentBatch}
-                  onChanged={refresh}
-                  onDeleted={() => setActiveBatch(undefined)}
-                />
+                <BatchActions key={currentBatch.id} batch={currentBatch} onChanged={refresh} />
               ) : null}
             </div>
             {batches.map((batch) => (
@@ -104,17 +99,15 @@ export function ClassesHierarchy() {
   );
 }
 
-// Rename/delete for the batch that's currently the open tab — lives once,
-// next to the tab list, rather than repeated as a heading inside every
-// tab's content (the tab label already says which batch this is).
+// Rename for the batch that's currently the open tab — lives once, next
+// to the tab list, rather than repeated as a heading inside every tab's
+// content (the tab label already says which batch this is).
 function BatchActions({
   batch,
   onChanged,
-  onDeleted,
 }: {
   batch: BatchRow;
   onChanged: () => void;
-  onDeleted: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [label, setLabel] = useState(batch.label);
@@ -127,13 +120,6 @@ function BatchActions({
     await updateBatch(batch.id, label.trim(), startYear);
     setSaving(false);
     setEditing(false);
-    onChanged();
-  }
-
-  async function remove() {
-    if (!confirm(`Delete batch "${batch.label}"? This removes every grade, division, and subject under it.`)) return;
-    await deleteBatch(batch.id);
-    onDeleted();
     onChanged();
   }
 
@@ -162,9 +148,6 @@ function BatchActions({
     <div className="flex shrink-0 items-center gap-0.5">
       <IconButton title="Rename batch" onClick={() => setEditing(true)}>
         <Pencil className="size-3.5" />
-      </IconButton>
-      <IconButton title="Delete batch" variant="destructive" onClick={remove}>
-        <Trash2 className="size-3.5" />
       </IconButton>
     </div>
   );

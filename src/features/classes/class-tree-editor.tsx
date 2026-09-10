@@ -2,21 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, Check, X, ChevronRight } from "lucide-react";
+import { Pencil, Check, X, ChevronRight } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { IconButton } from "./icon-button";
 import { AddDivisionCard, AddSubjectForm } from "./class-tree-forms";
-import {
-  updateGrade,
-  deleteGrade,
-  updateDivision,
-  deleteDivision,
-  updateClass,
-  deleteClass,
-  type BatchRow,
-} from "@/lib/data/classes";
+import { updateGrade, updateDivision, updateClass, type BatchRow } from "@/lib/data/classes";
 
 export function GradeSection({
   grade,
@@ -33,12 +25,6 @@ export function GradeSection({
   async function saveEdit() {
     await updateGrade(grade.id, level);
     setEditing(false);
-    onChanged();
-  }
-
-  async function remove() {
-    if (!confirm(`Delete Grade ${grade.level}? This removes every division and subject under it.`)) return;
-    await deleteGrade(grade.id);
     onChanged();
   }
 
@@ -68,9 +54,6 @@ export function GradeSection({
               <div className="flex items-center gap-0.5 pointer-events-none opacity-0 transition-opacity group-hover/grade:pointer-events-auto group-hover/grade:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
                 <IconButton title="Edit grade" onClick={() => setEditing(true)}>
                   <Pencil className="size-3.5" />
-                </IconButton>
-                <IconButton title="Delete grade" variant="destructive" onClick={remove}>
-                  <Trash2 className="size-3.5" />
                 </IconButton>
               </div>
             </>
@@ -111,12 +94,6 @@ function DivisionCard({
     onChanged();
   }
 
-  async function remove() {
-    if (!confirm(`Delete Division ${division.label}? This removes every subject under it.`)) return;
-    await deleteDivision(division.id);
-    onChanged();
-  }
-
   return (
     <div className="rounded-2xl border border-border bg-secondary/30 p-4">
       <div className="group/division flex items-center gap-1">
@@ -138,9 +115,6 @@ function DivisionCard({
             <div className="flex items-center gap-0.5 pointer-events-none opacity-0 transition-opacity group-hover/division:pointer-events-auto group-hover/division:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
               <IconButton title="Edit division" onClick={() => setEditing(true)}>
                 <Pencil className="size-3" />
-              </IconButton>
-              <IconButton title="Delete division" variant="destructive" onClick={remove}>
-                <Trash2 className="size-3" />
               </IconButton>
             </div>
           </>
@@ -176,12 +150,6 @@ function SubjectChip({
     onChanged();
   }
 
-  async function remove() {
-    if (!confirm(`Delete "${classRow.subject}"? This removes its lessons, notes, and results.`)) return;
-    await deleteClass(classRow.id);
-    onChanged();
-  }
-
   if (editing) {
     return (
       <div className="flex items-center gap-1 rounded-xl border border-border bg-card px-2 py-1.5">
@@ -211,9 +179,6 @@ function SubjectChip({
       <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/subject:opacity-100 focus-within:opacity-100">
         <IconButton title="Rename subject" onClick={() => setEditing(true)}>
           <Pencil className="size-3" />
-        </IconButton>
-        <IconButton title="Delete subject" variant="destructive" onClick={remove}>
-          <Trash2 className="size-3" />
         </IconButton>
       </div>
     </div>

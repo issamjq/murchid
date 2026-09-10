@@ -1,5 +1,4 @@
 import { supabase } from "@/lib/supabase/client";
-import { backendFetch } from "./backend";
 import type { GenerationResult, Tier } from "./generation";
 
 export interface ClassRow {
@@ -230,7 +229,10 @@ export async function listScheduledForDate(
       .from("goal_items")
       .select("id, kind, title, content")
       .in("goal_id", goalIds)
-      .eq("scheduled_for", date);
+      .eq("scheduled_for", date)
+      // Quiz/exam goal_items are superseded by their own `assessments` row
+      // at approval — counting both here doubles them up for the day.
+      .not("kind", "in", "(quiz,exam)");
     if (error) throw error;
     goalItems = data ?? [];
   }
@@ -460,14 +462,6 @@ export async function updateMaterial(
   if (error) throw error;
 }
 
-// Goes to the backend rather than straight to Supabase because an
-// uploaded material owns Backblaze objects — the original file and the
-// Markdown read out of it — that a row delete would orphan. It answers
-// 403 for shared curriculum material and 404 for a row that isn't hers.
-export function deleteMaterial(materialId: string): Promise<{ deleted: boolean }> {
-  return backendFetch(`/studio/materials/${materialId}`, { method: "DELETE" });
-}
-
 // A class needs at least one attached reference (syllabus, curriculum,
 // textbook chapter, or notes) before the studio or Goal Planner generates
 // anything for it — otherwise there's nothing to ground the draft in and
@@ -544,21 +538,9 @@ export async function updateBatch(id: string, label: string, startYear: number) 
   if (error) throw error;
 }
 
-export async function deleteBatch(id: string) {
-  const db = requireClient();
-  const { error } = await db.from("batches").delete().eq("id", id);
-  if (error) throw error;
-}
-
 export async function updateGrade(id: string, level: number) {
   const db = requireClient();
   const { error } = await db.from("grades").update({ level }).eq("id", id);
-  if (error) throw error;
-}
-
-export async function deleteGrade(id: string) {
-  const db = requireClient();
-  const { error } = await db.from("grades").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -568,28 +550,16 @@ export async function updateDivision(id: string, label: string) {
   if (error) throw error;
 }
 
-export async function deleteDivision(id: string) {
-  const db = requireClient();
-  const { error } = await db.from("divisions").delete().eq("id", id);
-  if (error) throw error;
-}
-
 export async function updateClass(id: string, subject: string) {
   const db = requireClient();
   const { error } = await db.from("classes").update({ subject }).eq("id", id);
   if (error) throw error;
 }
 
-export async function deleteClass(id: string) {
-  const db = requireClient();
-  const { error } = await db.from("classes").delete().eq("id", id);
-  if (error) throw error;
-}
-
 export interface UpcomingItem {
   id: string;
   title: string;
-  kind: "quiz" | "exam" | "slide_deck" | "note" | "activity" | "homework";
+  kind: "lesson_plan" | "quiz" | "exam" | "slide_deck" | "note" | "activity" | "homework";
   scheduledFor: string;
   classLabel: string;
   classId: string;
@@ -609,6 +579,11 @@ export async function listUpcoming(): Promise<UpcomingItem[]> {
         "id, title, kind, scheduled_for, goal:goals(class:classes(id, subject, division:divisions(label, grade:grades(level))))",
       )
       .not("scheduled_for", "is", null)
+      // Quiz/exam goal_items are the pre-approval draft of what becomes its
+      // own `assessments` row at commit — once approved, that assessments
+      // row is the one with the real (possibly hand-adjusted) date, so
+      // counting this row too would double it up on the calendar.
+      .not("kind", "in", "(quiz,exam)")
       .order("scheduled_for", { ascending: true }),
   ]);
   if (assessments.error) throw assessments.error;

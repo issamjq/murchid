@@ -1,18 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, FileUp, Pencil, Trash2 } from "lucide-react";
+import { Eye, EyeOff, FileUp, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  deleteMaterial,
-  setMaterialVisibleToStudents,
-  updateMaterial,
-  type MaterialRow,
-} from "@/lib/data/classes";
+import { setMaterialVisibleToStudents, updateMaterial, type MaterialRow } from "@/lib/data/classes";
 
 export function MaterialCard({
   material,
@@ -67,22 +62,6 @@ export function MaterialCard({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save those changes.");
     } finally {
-      setBusy(false);
-    }
-  }
-
-  async function remove() {
-    if (busy) return;
-    if (!confirm(`Delete "${material.title}"? This removes it from every class it's attached to.`)) {
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await deleteMaterial(material.id);
-      onChanged();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't delete that.");
       setBusy(false);
     }
   }
@@ -173,16 +152,6 @@ export function MaterialCard({
                 onClick={() => setEditing(true)}
               >
                 <Pencil className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled={busy}
-                className="text-muted-foreground hover:text-destructive"
-                aria-label={`Delete ${material.title}`}
-                onClick={remove}
-              >
-                <Trash2 className="size-3.5" />
               </Button>
             </div>
           ) : null}

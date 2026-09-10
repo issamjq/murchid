@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2, LibraryBig, Paperclip, FileText } from "lucide-react";
+import { Plus, LibraryBig, Paperclip, FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import { SYLLABUS_TYPES } from "@/features/onboarding/uae-institutions";
 import {
   listSharedMaterials,
   createSharedMaterial,
-  deleteSharedMaterial,
   uploadSharedLibraryFile,
   sharedLibraryFileUrl,
   type SharedMaterialRow,
@@ -86,12 +85,6 @@ export function SharedLibraryManager() {
     } finally {
       setSaving(false);
     }
-  }
-
-  async function remove(id: string) {
-    if (!confirm("Remove this document from the shared library?")) return;
-    await deleteSharedMaterial(id);
-    refresh();
   }
 
   const grouped = rows ? groupBySyllabusThenGrade(rows) : null;
@@ -242,14 +235,6 @@ export function SharedLibraryManager() {
                               </a>
                             </Button>
                           ) : null}
-                          <button
-                            type="button"
-                            onClick={() => remove(d.id)}
-                            title="Remove"
-                            className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="size-4" />
-                          </button>
                         </div>
                       </div>
                     ))}

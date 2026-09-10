@@ -248,11 +248,17 @@ export function GoalPlannerForm() {
     setScheduleError(null);
     try {
       // Write the (possibly hand-adjusted) dates onto goal_items before
-      // approving, so a later view of Lessons/Quizzes/etc. already shows
-      // the real date rather than what the proposal first suggested.
+      // approving, so a later view of Lessons/Presentations/etc. already
+      // shows the real date rather than what the proposal first suggested.
+      // Quiz/exam ids are excluded: commitApproval below gives each of
+      // those its own row in `assessments`, which is what Quizzes/Exams
+      // and the calendar actually read — writing scheduled_for here too
+      // would leave the same item counted twice on the calendar.
+      const assessmentGoalItemIds = new Set(schedule.assessments.map((a) => a.goal_item_id));
       const { supabase } = await import("@/lib/supabase/client");
       if (supabase) {
         for (const [goalItemId, date] of dateByGoalItemId) {
+          if (assessmentGoalItemIds.has(goalItemId)) continue;
           await supabase.from("goal_items").update({ scheduled_for: date }).eq("id", goalItemId);
         }
       }
