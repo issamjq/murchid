@@ -18,6 +18,14 @@ import { SharedLibraryPicker } from "./shared-library-picker";
 // documents, or choose from the materials."
 const MIN_GROUNDED_PROMPT_LENGTH = 40;
 
+// Starters a teacher can pick to reach MIN_GROUNDED_PROMPT_LENGTH without
+// having to phrase it from scratch — they fill in the brackets after.
+const PROMPT_STARTERS = [
+  "Cover [topic], focusing on [subtopic 1] and [subtopic 2].",
+  "This term builds toward [skill], across [topic 1] through [topic 2].",
+  "Introduce [topic], go deeper into [subtopic], then review with [activity].",
+];
+
 export interface ClassOption {
   id: string;
   label: string;
@@ -176,11 +184,13 @@ export function PlanIntake({
   ownerId,
   busy,
   onGenerate,
+  onClassChange,
 }: {
   classes: ClassOption[] | null;
   ownerId: string | null;
   busy: boolean;
   onGenerate: (payload: GeneratePayload) => void;
+  onClassChange?: (classId: string) => void;
 }) {
   const [classId, setClassId] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -189,7 +199,17 @@ export function PlanIntake({
   const firstClassId = classes?.[0]?.id ?? "";
   const selectedClassId = classId || firstClassId;
 
+  useEffect(() => {
+    if (selectedClassId) onClassChange?.(selectedClassId);
+  }, [selectedClassId, onClassChange]);
+
   const promptIsDetailed = prompt.trim().length >= MIN_GROUNDED_PROMPT_LENGTH;
+  const promptCharsToGo = Math.max(0, MIN_GROUNDED_PROMPT_LENGTH - prompt.trim().length);
+
+  function insertStarter(starter: string) {
+    setPrompt((prev) => (prev.trim() ? `${prev.trim()} ${starter}` : starter));
+  }
+
   const grounded =
     sources.referenceCount > 0 ||
     sources.hasUpload ||
@@ -255,6 +275,27 @@ export function PlanIntake({
             disabled={busy}
             placeholder="e.g. Term 2, Unit 3: Trade routes of the ancient world. Cover the Silk Road, maritime trade, and the spread of ideas."
           />
+          <p className={`text-xs ${promptCharsToGo > 0 ? "text-muted-foreground" : "text-success"}`}>
+            {promptCharsToGo > 0
+              ? `${promptCharsToGo} more character${promptCharsToGo === 1 ? "" : "s"} to count as grounding on its own`
+              : "Detailed enough to plan from on its own."}
+          </p>
+          {promptCharsToGo > 0 ? (
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {PROMPT_STARTERS.map((starter) => (
+                <Button
+                  key={starter}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-auto whitespace-normal py-1 text-left text-xs font-normal"
+                  onClick={() => insertStarter(starter)}
+                >
+                  {starter}
+                </Button>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         {selectedClassId && !busy ? (

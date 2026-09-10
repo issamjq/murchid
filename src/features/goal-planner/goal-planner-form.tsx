@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { Check, Lock, AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,11 @@ import {
   schedulePlan,
   approvePlan,
   commitApproval,
+  getLatestUnapprovedGoal,
   type GoalRow,
   type GoalItemRow,
   type PlanStartedData,
+  type PlanDoneData,
   type ScheduleResult,
 } from "@/lib/data/goal-planner";
 import { PlanIntake, type ClassOption, type GeneratePayload } from "./plan-intake";
@@ -49,6 +51,14 @@ function flattenClasses(batches: BatchRow[]): ClassOption[] {
           ),
         ),
     );
+}
+
+// Generation streams for 2-5 minutes (per PlanIntake's own copy), long
+// enough that a teacher reasonably switches tabs — a native notification
+// reaches them there; the in-page banner covers everyone else.
+function notifyBrowser(title: string, body: string) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission === "granted") new Notification(title, { body });
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -83,17 +93,64 @@ export function GoalPlannerForm() {
   const [committing, setCommitting] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
 
+  // Which class's leftover, unapproved draft has already been offered —
+  // so switching classes back and forth doesn't re-hijack the screen.
+  const [autoResumedFor, setAutoResumedFor] = useState<string | null>(null);
+  const [justCompleted, setJustCompleted] = useState(false);
+  const [resumedDraft, setResumedDraft] = useState(false);
+
   useEffect(() => {
     listHierarchy().then((data) => setClasses(flattenClasses(data)));
   }, []);
 
+  // A generated-but-unapproved goal from an earlier visit (browser back,
+  // reload, a different tab) — without this it sits in the database with
+  // no way back to review/approve, which is exactly "stuck in draft".
+  const handleClassChange = useCallback(
+    async (classId: string) => {
+      if (stage !== "intake" || autoResumedFor === classId) return;
+      setAutoResumedFor(classId);
+      try {
+        const resumable = await getLatestUnapprovedGoal(classId);
+        if (resumable && resumable.items.length > 0) {
+          setGoal(resumable.goal);
+          setItems(resumable.items);
+          setFailedKinds([]);
+          setGenerationError(resumable.goal.error);
+          setResumedDraft(true);
+          setStage("review");
+        }
+      } catch {
+        // Resuming is a convenience on top of generating fresh — if the
+        // lookup fails, the teacher can still just generate a new plan.
+      }
+    },
+    [stage, autoResumedFor],
+  );
+
+  function startOver() {
+    setStage("intake");
+    setGoal(null);
+    setStarted(null);
+    setItems([]);
+    setFailedKinds([]);
+    setGenerationError(null);
+    setResumedDraft(false);
+    setJustCompleted(false);
+  }
+
   async function generate({ classId, prompt, source, materialIds }: GeneratePayload) {
     if (!user) return;
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
     setStage("generating");
     setGenerationError(null);
     setItems([]);
     setFailedKinds([]);
     setStarted(null);
+    setResumedDraft(false);
+    setJustCompleted(false);
 
     let createdGoal: GoalRow;
     try {
@@ -130,12 +187,19 @@ export function GoalPlannerForm() {
             const d = data as { kind: string; message: string };
             setFailedKinds((prev) => [...prev, d.kind]);
           } else if (event === "done") {
+            const d = data as PlanDoneData;
             finishGoal(createdGoal.id, { status: "draft" }).catch(() => {});
+            setJustCompleted(true);
+            notifyBrowser(
+              "Term plan ready",
+              `${started?.class ?? "Your"} plan finished — ${d.generated} item${d.generated === 1 ? "" : "s"} ready to review.`,
+            );
             setStage("review");
           } else if (event === "failed") {
             const d = data as { message: string };
             finishGoal(createdGoal.id, { status: "failed", error: d.message }).catch(() => {});
             setGenerationError(d.message);
+            notifyBrowser("Term plan failed", d.message);
             setStage("review");
           }
         },
@@ -145,6 +209,7 @@ export function GoalPlannerForm() {
         e instanceof BackendError ? e.message : e instanceof Error ? e.message : "Generation failed";
       setGenerationError(message);
       finishGoal(createdGoal.id, { status: "failed", error: message }).catch(() => {});
+      notifyBrowser("Term plan failed", message);
       setStage("review");
     }
   }
@@ -230,6 +295,7 @@ export function GoalPlannerForm() {
         ownerId={user?.id ?? null}
         busy={stage !== "intake"}
         onGenerate={generate}
+        onClassChange={handleClassChange}
       />
 
       <Card>
@@ -263,6 +329,34 @@ export function GoalPlannerForm() {
                 <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3">
                   <AlertTriangle className="size-4 shrink-0 text-destructive" />
                   <p className="text-xs text-destructive">{generationError}</p>
+                </div>
+              ) : null}
+              {justCompleted ? (
+                <div className="flex items-start justify-between gap-2 rounded-md border border-success/40 bg-success/5 p-3">
+                  <div className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-4 shrink-0 text-success" />
+                    <p className="text-xs">
+                      Generation's done — {items.length} item{items.length === 1 ? "" : "s"} ready to
+                      review below.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setJustCompleted(false)}
+                    className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              ) : null}
+              {resumedDraft && stage === "review" ? (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border bg-secondary/40 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Picked up a draft from earlier that hadn&apos;t been approved yet.
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={startOver}>
+                    Start a new plan instead
+                  </Button>
                 </div>
               ) : null}
               {started?.unread_materials && started.unread_materials.length > 0 ? (

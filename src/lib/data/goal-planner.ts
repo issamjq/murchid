@@ -51,6 +51,45 @@ export async function recordGoalSources(
   if (error) throw error;
 }
 
+// A goal a teacher generated but never approved — after a page reload or
+// a browser-back, the studio-context stage resets to "intake" and this is
+// the only way back to reviewing/approving it rather than it sitting
+// invisible in the database.
+export async function getLatestUnapprovedGoal(
+  classId: string,
+): Promise<{ goal: GoalRow; items: GoalItemRow[] } | null> {
+  const db = requireClient();
+  const { data: goalRow, error: goalError } = await db
+    .from("goals")
+    .select("id, class_id, status, title, error, term_start, term_end")
+    .eq("class_id", classId)
+    .eq("status", "draft")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (goalError) throw goalError;
+  if (!goalRow) return null;
+
+  const { data: itemRows, error: itemsError } = await db
+    .from("goal_items")
+    .select("id, kind, title, content, status, scheduled_for")
+    .eq("goal_id", goalRow.id)
+    .order("created_at", { ascending: true });
+  if (itemsError) throw itemsError;
+
+  return {
+    goal: goalRow as GoalRow,
+    items: (itemRows ?? []).map((row) => ({
+      id: row.id,
+      kind: row.kind,
+      title: row.title,
+      content: (row.content as { markdown: string } | null)?.markdown ?? "",
+      status: row.status,
+      scheduled_for: row.scheduled_for,
+    })),
+  };
+}
+
 export async function finishGoal(
   goalId: string,
   patch: { status: "draft" | "failed"; title?: string; error?: string },
