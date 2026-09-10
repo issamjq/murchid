@@ -169,6 +169,7 @@ function PlanSources({
           ownerId={ownerId}
           classId={classId}
           showUpload={false}
+          showSubmitButton={false}
           onAttached={() => {
             loadReferences();
             setPanel(null);

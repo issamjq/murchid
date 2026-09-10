@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Search } from "lucide-react";
 
+import { Input } from "@/components/ui/input";
 import {
   getLibraryFilters,
   searchLibrary,
@@ -23,6 +25,7 @@ export function SharedLibraryPicker({
   const [board, setBoard] = useState("");
   const [grade, setGrade] = useState("");
   const [subject, setSubject] = useState("");
+  const [q, setQ] = useState("");
   const [results, setResults] = useState<LibraryMaterial[] | null>(null);
   const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -33,14 +36,24 @@ export function SharedLibraryPicker({
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load the library"));
   }, []);
 
+  // Debounced — a title/keyword search fires on every keystroke otherwise.
   useEffect(() => {
-    searchLibrary({ board: board || undefined, grade: grade || undefined, subject: subject || undefined, limit: 40 })
-      .then((r) => {
-        setResults(r.materials);
-        setTotal(r.total);
+    const handle = setTimeout(() => {
+      searchLibrary({
+        board: board || undefined,
+        grade: grade || undefined,
+        subject: subject || undefined,
+        q: q.trim() || undefined,
+        limit: 40,
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Search failed"));
-  }, [board, grade, subject]);
+        .then((r) => {
+          setResults(r.materials);
+          setTotal(r.total);
+        })
+        .catch((e) => setError(e instanceof Error ? e.message : "Search failed"));
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [board, grade, subject, q]);
 
   const boardOptions = filters?.boards ?? [];
   const activeBoard = boardOptions.find((b) => b.board === board);
@@ -48,6 +61,15 @@ export function SharedLibraryPicker({
   return (
     <div className="space-y-2 rounded-md border border-border p-3">
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by title or keyword…"
+          className="h-8 pl-8 text-xs"
+        />
+      </div>
       <div className="flex flex-wrap gap-2">
         <select
           value={board}

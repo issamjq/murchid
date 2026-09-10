@@ -14,12 +14,15 @@ export function AddOwnReferenceForm({
   classId,
   onAttached,
   showUpload = true,
+  showSubmitButton = true,
 }: {
   ownerId: string;
   classId: string;
   onAttached: () => void;
   /** Off where the surface already offers uploading of its own. */
   showUpload?: boolean;
+  /** Off where the surface doesn't want an explicit submit step. */
+  showSubmitButton?: boolean;
 }) {
   const [title, setTitle] = useState("");
   const [bodyMd, setBodyMd] = useState("");
@@ -69,9 +72,11 @@ export function AddOwnReferenceForm({
         className="resize-none text-xs"
       />
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      <Button size="sm" onClick={submit} disabled={saving || !title.trim() || !bodyMd.trim()}>
-        {saving ? "Saving…" : "Add & attach"}
-      </Button>
+      {showSubmitButton ? (
+        <Button size="sm" onClick={submit} disabled={saving || !title.trim() || !bodyMd.trim()}>
+          {saving ? "Saving…" : "Add & attach"}
+        </Button>
+      ) : null}
     </div>
   );
 }
