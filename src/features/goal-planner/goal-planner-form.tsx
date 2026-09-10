@@ -34,6 +34,19 @@ import { PlanIntake, type ClassOption, type GeneratePayload } from "./plan-intak
 
 type Stage = "intake" | "generating" | "review" | "scheduling" | "approved";
 
+// What the toggle swaps out when a teacher switches between the draft
+// that was already there and a fresh one — a real swap, not a discard,
+// so nothing is destroyed just because the toggle was clicked.
+interface StashedView {
+  goal: GoalRow | null;
+  items: GoalItemRow[];
+  stage: Stage;
+  error: string | null;
+  justCompleted: boolean;
+  failedKinds: string[];
+  resumedDraft: boolean;
+}
+
 function flattenClasses(batches: BatchRow[]): ClassOption[] {
   return batches
     .slice()
@@ -98,6 +111,8 @@ export function GoalPlannerForm() {
   const [autoResumedFor, setAutoResumedFor] = useState<string | null>(null);
   const [justCompleted, setJustCompleted] = useState(false);
   const [resumedDraft, setResumedDraft] = useState(false);
+  // The side not currently shown, kept warm so toggling is a swap, never a wipe.
+  const [otherView, setOtherView] = useState<StashedView | null>(null);
 
   useEffect(() => {
     listHierarchy().then((data) => setClasses(flattenClasses(data)));
@@ -128,19 +143,46 @@ export function GoalPlannerForm() {
     [stage, autoResumedFor],
   );
 
-  function startOver() {
-    setStage("intake");
-    setGoal(null);
-    setStarted(null);
-    setItems([]);
-    setFailedKinds([]);
-    setGenerationError(null);
-    setResumedDraft(false);
-    setJustCompleted(false);
-    // The draft itself isn't deleted, only hidden — clearing this lets
-    // switching away and back to the class resurface it, instead of
-    // "start over" being an irreversible dead end for this session.
-    setAutoResumedFor(null);
+  // Toggles between "the draft that was already there" and "a new one" —
+  // an actual swap, so whichever side you leave is exactly how you left
+  // it when you come back, not silently discarded.
+  function switchView() {
+    if (stage === "generating" || stage === "scheduling") return;
+    setOtherView((prevOther) => {
+      const currentSnapshot: StashedView = {
+        goal,
+        items,
+        stage,
+        error: generationError,
+        justCompleted,
+        failedKinds,
+        resumedDraft,
+      };
+      const next = prevOther ?? {
+        goal: null,
+        items: [],
+        stage: "intake" as Stage,
+        error: null,
+        justCompleted: false,
+        failedKinds: [],
+        resumedDraft: false,
+      };
+      setGoal(next.goal);
+      setItems(next.items);
+      setStage(next.stage);
+      setGenerationError(next.error);
+      setJustCompleted(next.justCompleted);
+      setFailedKinds(next.failedKinds);
+      setResumedDraft(next.resumedDraft);
+      // Scheduling progress is tied to whichever goal was active — start
+      // clean rather than carrying a stale proposal onto the other one.
+      setScheduleResult(null);
+      setTermStart("");
+      setTermEnd("");
+      setDateByGoalItemId(new Map());
+      setScheduleError(null);
+      return currentSnapshot;
+    });
   }
 
   async function generate({ classId, prompt, source, materialIds }: GeneratePayload) {
@@ -313,6 +355,53 @@ export function GoalPlannerForm() {
           <CardTitle>Draft</CardTitle>
         </CardHeader>
         <CardContent>
+          {resumedDraft || otherView ? (
+            <div
+              role="tablist"
+              aria-label="Draft to show"
+              className="mb-4 inline-flex rounded-md border border-border bg-secondary/40 p-0.5 text-xs"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={resumedDraft}
+                disabled={resumedDraft || stage === "generating" || stage === "scheduling"}
+                onClick={switchView}
+                title={
+                  stage === "generating" || stage === "scheduling"
+                    ? "Finish this before switching"
+                    : undefined
+                }
+                className={`rounded px-3 py-1.5 font-medium transition-colors disabled:cursor-default ${
+                  resumedDraft
+                    ? "bg-background shadow-sm"
+                    : "text-muted-foreground hover:text-foreground disabled:opacity-50"
+                }`}
+              >
+                Existing draft
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!resumedDraft}
+                disabled={!resumedDraft || stage === "generating" || stage === "scheduling"}
+                onClick={switchView}
+                title={
+                  stage === "generating" || stage === "scheduling"
+                    ? "Finish this before switching"
+                    : undefined
+                }
+                className={`rounded px-3 py-1.5 font-medium transition-colors disabled:cursor-default ${
+                  !resumedDraft
+                    ? "bg-background shadow-sm"
+                    : "text-muted-foreground hover:text-foreground disabled:opacity-50"
+                }`}
+              >
+                New plan
+              </button>
+            </div>
+          ) : null}
+
           {stage === "intake" && (
             <p className="py-10 text-center text-sm text-muted-foreground">
               Generate a plan to see the draft here.
@@ -360,14 +449,9 @@ export function GoalPlannerForm() {
                 </div>
               ) : null}
               {resumedDraft && stage === "review" ? (
-                <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border bg-secondary/40 p-3">
-                  <p className="text-xs text-muted-foreground">
-                    Picked up a draft from earlier that hadn&apos;t been approved yet.
-                  </p>
-                  <Button variant="ghost" size="sm" onClick={startOver}>
-                    Start a new plan instead
-                  </Button>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  From an earlier session — not approved yet.
+                </p>
               ) : null}
               {started?.unread_materials && started.unread_materials.length > 0 ? (
                 <p className="text-xs text-warning">
