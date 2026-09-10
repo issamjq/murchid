@@ -137,6 +137,10 @@ export function GoalPlannerForm() {
     setGenerationError(null);
     setResumedDraft(false);
     setJustCompleted(false);
+    // The draft itself isn't deleted, only hidden — clearing this lets
+    // switching away and back to the class resurface it, instead of
+    // "start over" being an irreversible dead end for this session.
+    setAutoResumedFor(null);
   }
 
   async function generate({ classId, prompt, source, materialIds }: GeneratePayload) {

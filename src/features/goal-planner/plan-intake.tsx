@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, FileWarning, LibraryBig, NotebookPen, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -200,8 +200,16 @@ export function PlanIntake({
   const firstClassId = classes?.[0]?.id ?? "";
   const selectedClassId = classId || firstClassId;
 
+  // Fires only when the class id itself changes, not whenever the parent's
+  // callback identity does (it's a useCallback keyed on stage/autoResumedFor,
+  // both of which change on every "start a new plan" click) — otherwise
+  // dismissing a resumed draft immediately re-triggers the same resume.
+  const notifiedClassIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedClassId) onClassChange?.(selectedClassId);
+    if (selectedClassId && selectedClassId !== notifiedClassIdRef.current) {
+      notifiedClassIdRef.current = selectedClassId;
+      onClassChange?.(selectedClassId);
+    }
   }, [selectedClassId, onClassChange]);
 
   const promptIsDetailed = prompt.trim().length >= MIN_GROUNDED_PROMPT_LENGTH;
@@ -299,7 +307,7 @@ export function PlanIntake({
           ) : null}
         </div>
 
-        {selectedClassId && !busy ? (
+        {selectedClassId ? (
           <PlanSources
             key={selectedClassId}
             classId={selectedClassId}
