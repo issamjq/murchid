@@ -4,30 +4,19 @@ Split out of [backend/00-open.md](backend/00-open.md) on 2026-09-10, so
 that file could be the backend team's queue alone. Nothing here is
 waiting on them; most of it is what *they* are waiting on.
 
-## 1. Ratify the tool-calling behaviour we never chose
+## 1. Decide where the conversational studio lives
 
-**`/api/studio/agent` shipped anyway** (probed 2026-09-10: 401, was
-404). It was blocked on a question only we could answer and we never
-answered it, so whatever it does now was decided without us.
+**`/api/studio/agent` is built and has no home.** There is no AI Studio
+page in the rebuilt app, so nothing can call it. Its own page, or a
+conversational mode inside each class tab's composer? Product call, and
+it blocks wiring the one route whose whole purpose is a surface we
+haven't built.
 
-The question: **what happens when a request needs tool calling and the
-four-provider rotation lands on a provider that doesn't support it**
-(Groq does, NVIDIA varies, OmniRoute depends on what it fronts).
-Previously any provider served any request; tool calling ends that.
-
-The three plausible answers, and what each costs:
-
-- **Restrict tool requests to capable providers** — smaller pool, more
-  queuing under load, but behaviour is consistent.
-- **Degrade to a no-tools answer** — always responds, but the same
-  question silently gives a worse answer depending on which provider
-  happened to serve it. This is the one a teacher experiences as a
-  broken product rather than a busy one.
-- **Fail and retry elsewhere** — consistent, costs latency on a miss.
-
-So this is no longer "send them a decision" — it's **find out which one
-they implemented, then keep it or change it.** The same answer governs
-chat's tool half.
+Worth knowing before deciding: the agent never writes. Its `generate`
+action is a *request* — we post it to `/api/studio/generate` under the
+teacher's own session, so she sees what's about to be drafted before
+any credit is spent, and one-writer-per-table survives. That works
+either as a page or as an in-tab mode.
 
 ## 2. Wire the five routes that are live and uncalled
 
@@ -47,8 +36,21 @@ actually build. Wire each and correct as needed:
 | `POST /api/studio/regenerate` | SSE, `{ kind, section, current, prompt }` | Returns the section body only — we re-attach our own `## title` |
 | `POST /api/studio/quiz-tweak` | SSE, `{ quiz: { questions }, instruction }` → `done.quiz` | A truncated/unparseable reply is refused outright rather than partially applied, because our sync is a transactional replace — a short answer would *delete* the omitted questions |
 | `POST /api/onboarding/parse` | JSON, `{ documents: [...] }` → `{ fields, found, missing, unread? }` | Runs before the profile exists, so it carries its own auth gate. Three files max |
-| `POST /api/chat` | SSE, `{ message, scope?, sessionId? }` | Sessions persist across restarts. `onTool`/`onAction` fire only once §1 is settled |
-| `POST /api/studio/agent` | **Unknown — never specced to us** | Ask for the contract rather than inferring it; it's the one route whose shape wasn't read off our own old code |
+| `POST /api/chat` | SSE, `{ message, scope?, sessionId? }` — the corner widget | Frames: `session` → (`tool`/`action`/`delta`)… → `done`. Store `sessionId` from the first frame, send it back next turn |
+| `POST /api/studio/agent` | SSE, `{ message, classId?, sessionId? }` — the conversational studio | Same frames, plus the `generate` action. `classId` is context, not permission — it's re-checked against `owner_id` server-side |
+
+**Handling the two actions.** An action is terminal: at most one per
+turn, and the reply after it is the last thing said.
+
+- `navigate` → route to the `path` field **verbatim**. Don't rebuild it
+  from `where`; the class is already ownership-checked before the path
+  is built.
+- `generate` (agent only) → POST the body to `/api/studio/generate`
+  under her own session. It's a request, not a result — same credit
+  check, same grounding, same one-writer rule as the composer form.
+
+Show `tool` frames as "Looking that up…" with the tool named. Naming it
+is what makes the answer trustworthy rather than an oracle.
 
 **Wire-format rule that decides whether any of these work:** frames must
 carry the discriminator *inside* the payload — `data: {"type":"delta",…}`.
@@ -83,6 +85,10 @@ holds on our side.
 - **Single-device session enforcement** — whether it comes back at all.
   If yes, the column + RLS predicate get designed here first, then the
   backend adds its check.
+- **`goal_days` — our answer is don't resurrect it.** It was never
+  created by a tracked migration, and `goal_items.scheduled_for` is
+  already what the placement path writes and the calendar reads. Sent to
+  the backend as settled unless they surface something we can't see.
 - **A unique index on `(goal_id, kind)`.** Deliberately *not* added.
   No duplicates exist today, but the retry path re-drafts only the kinds
   that failed, so a unique index would convert a duplicate into a failed
@@ -131,6 +137,20 @@ Working verification queries live in the **backend** repo at
   credits each; exam 2, slide_deck 2, 1 each for the other five.
   `/api/studio/generate` writes **nothing**, to the ledger or any table,
   so a single generation quotes zero.
+- **The tool-calling question is answered** — and well. All five
+  providers were tested with live calls: groq, google, openrouter and
+  nvidia do function calling, omniroute doesn't. The rotation now
+  filters on `supports_tools` when a request carries tools, and answers
+  `503 NO_TOOL_PROVIDER` if none is reachable. That's the
+  restrict-to-capable option, with a failure we can distinguish from a
+  bad request. Nothing left for us to decide.
+- **`navigate`'s allowlist is correct** — we checked all 21 paths
+  against the running app (7 sidebar, 14 class tabs). Note `/roadmap`
+  lives in the `(admin)` route group but is a real teacher-facing URL.
+  **If we add or rename a page, tell the backend** — it's one line for
+  them, and a dead end for a teacher if it goes stale.
+- **Struck by agreement:** `GET /api/images/:id` and
+  `POST /api/corpus/search`.
 - **Term-plan placement works** — seven items dated Sep 14 → Dec 11,
   zero on a weekend, teaching order intact with the exam last, and
   `assessments.goal_item_id` filled for both assessments.

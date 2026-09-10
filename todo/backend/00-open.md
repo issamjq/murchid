@@ -1,41 +1,50 @@
 # Open for the backend team
 
-Re-verified 2026-09-10 by probe against the live service.
+Verified 2026-09-10 against `8737eec`. Our side is in
+[../our-side.md](../our-side.md).
 
-| # | Item | State |
+## Answers you asked for
+
+- **`GET /api/images/:id` — strike it.** Nothing in the rebuilt frontend
+  expects it. Don't carry the spec.
+- **`POST /api/corpus/search` — strike it.** Grounding injects
+  server-side; nothing will call it.
+- **`navigate`'s allowlist is correct.** We checked all 21 paths against
+  the running app: 7 sidebar entries and 14 class tabs, all real.
+  `roadmap` is the one worth knowing about — it lives in the `(admin)`
+  route group, but the URL really is `/roadmap` and the teacher sidebar
+  links to it, so keep it.
+- **We'll tell you when the IA moves.** Agreed it's a one-line change on
+  your side and a dead end for a teacher if it goes stale.
+
+## Still open
+
+| # | Item | Blocked on |
 |---|---|---|
-| 1 | **`POST /api/studio/agent`** | ✅ **Built** — now 401 (was 404), control paths still 404. See the note below: we never sent the tool-calling answer it was waiting on, so confirm what it does on a provider that can't do function calling |
-| 2 | **Student invites** | ⏸ **Not built** — no route at any candidate path, no invite table. Correct if still deliberately held on the sender; flagging only so it isn't assumed done |
-| 3 | **`STRIPE_PRICE_PRO_MONTHLY` / `_ANNUAL` in Render** | ❓ **Unverified** — can't be checked from outside (see below) |
-| 4 | **Confirm the `rk_live_…` key mode** | ❓ **Unanswered** — still live money |
+| 1 | **Student invites** | Sender is set to `dev.mjq@gmail.com`, but confirm it's *validated* in Brevo — and it can't be the production sender. A `gmail.com` From address can't carry SPF/DKIM for a domain nobody owns, so Brevo-sent mail fails DMARC alignment and gets spam-foldered under Google/Yahoo's 2024 rules. Brevo still answers 201. Needs `invites@murchid.com` with domain authentication |
+| 2 | **`POST /api/billing/plans`** | The owner deciding what Pro actually includes |
+| 3 | **`STRIPE_PRICE_PRO_MONTHLY` / `_ANNUAL` in Render** | The owner creating the recurring prices in Stripe |
+| 4 | **Confirm the `rk_live_…` key mode** | You, to answer. Still live money |
+| 5 | **`goal_days`** — resurrect, or read `goal_items.scheduled_for`? | Us. Answer below |
 
-## Why 3 and 4 can't be verified by probe
+**On `goal_days`:** our read is **don't resurrect it.** It was never
+created by any tracked migration, `goal_items.scheduled_for` is already
+the thing the placement path writes and the calendar reads, and the one
+placed plan proves it works end to end — 7 items dated, zero weekend,
+order intact. Reviving a table nothing has written since the rebuild
+would add a second source of truth for the same fact. Tell us if that
+breaks something on your side we can't see; otherwise treat it as
+settled and wire the last of the planner against `scheduled_for`.
 
-`/api/billing/checkout` and `/portal` are correctly auth-gated (401
-without a token) and the service exposes no configuration anywhere —
-`/` and `/healthz` return service name and uptime only, which is right.
+## Two things worth saying
 
-So telling `503 price_not_configured` from a working checkout needs an
-**authenticated** call. On an `rk_live_…` key that creates a real Stripe
-Checkout Session against live payment infrastructure. Not doing that
-without a deliberate go-ahead, especially while item 4 is the open
-question. Either:
-
-- confirm in the Stripe dashboard that the two recurring prices exist
-  and their ids match what's set in Render, or
-- say the word and we'll run one authenticated checkout against a test
-  key once item 4 is settled.
-
-## On the agent route shipping
-
-Its blocker was a question we owed you: what happens when a request
-needs tool calling and the four-provider rotation lands on a provider
-that doesn't support it (Groq does, NVIDIA varies, OmniRoute depends on
-what it fronts). We never sent an answer, so whatever it does now is a
-choice made without us.
-
-Not a complaint if it's a reasonable default — just tell us which:
-restrict tool requests to capable providers, degrade to a no-tools
-answer, or fail and retry elsewhere. A teacher hitting the third
-behaviour unknowingly is the one that reads as a broken product rather
-than a busy one. Same answer still governs chat's tool half.
+- **The tool-calling answer is better than the question deserved.**
+  Testing all five providers with live calls rather than reading docs,
+  then filtering the rotation on `supports_tools` and answering
+  `503 NO_TOOL_PROVIDER` when none is reachable, is the option we'd have
+  picked — consistent behaviour, and a failure that's distinguishable
+  from a bad request so we can degrade instead of blind-retrying.
+- **The IA drift you caught is the more useful find.** Twelve of
+  thirteen paths 404ing while the *nouns* were all correct is exactly
+  the failure that reads as plausible in review. Deriving both the tool
+  and the guide from the running app is the right fix.
