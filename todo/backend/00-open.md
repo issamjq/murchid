@@ -5,6 +5,18 @@
 > requests is a folder nobody reads. This file is the whole outstanding
 > list. If it is not here, it is not waiting on anyone.
 
+> **Superseded 2026-09-04 for backend availability.** Two days after the
+> above, `09-schema-mismatch-blocks-everything.md` found `final/backend` —
+> the branch actually deployed — running against a schema that no longer
+> exists, and `10-remaining-after-keys.md` confirmed it's a 2,700-line
+> scaffold (boot, auth, health, the key pool), not the 18,700-line
+> `backendv2` this file was written against. The "Waiting on the backend"
+> table below (grounded generation, derive) and the "§08 was never
+> missing" note describe **`backendv2`, which was never merged** — on
+> `final/backend` both 404 outright. Treat
+> [10-remaining-after-keys.md](10-remaining-after-keys.md) as the current
+> picture of what's reachable; this file stays as the original record.
+
 ## Answered: production is `backendv2`
 
 Settled 2 Sep, and not by probing — the service found our uniquely-named
@@ -33,11 +45,15 @@ stayed healthy throughout because they read Supabase directly.
 | — | **Grounded generation** — inject retrieved passages into lesson and quiz prompts, prefer her material over ours, cite which source a section drew on. The corpus and `/api/corpus/search` now exist; this is the step that uses them | this file, §3 |
 | 15 | **Derive, exercised for real** — `/api/curriculum/derive` is built and its logic verified on a CBSE syllabus, but the table below still lists the HTTP route and the `not_a_syllabus` refusal as unverified. The syllabus upload now sits next to the derive action instead of in another screen, so this is finally reachable in one sitting. Needs one real run: upload → read → units, and one deliberate non-syllabus to see the refusal | this file, table below |
 
-**§08 was never missing.** The route exists and `skill_ids` are honoured
-through `resolveSkills({ explicitIds })`, on both branches. Our 404 was
-the old host or the auth wall. The spec stays in the folder as
-documentation; it is not an ask. Worth re-testing before the frontend
-keeps falling back to its local compile.
+**§08 was never missing — on `backendv2`.** The route exists there and
+`skill_ids` are honoured through `resolveSkills({ explicitIds })`, on
+both branches. Our 404 was the old host or the auth wall. *(Correction,
+2026-09-04: on `final/backend` — the branch actually deployed — the
+route, and the `teaching_skills`/`skill_assignments` tables it reads,
+genuinely don't exist. See
+[10-remaining-after-keys.md](10-remaining-after-keys.md) §3: this isn't
+"next in the queue," it's a spec for a feature the rebuilt frontend has
+no UI for at all.)*
 
 One open question of ours, in the other direction:
 

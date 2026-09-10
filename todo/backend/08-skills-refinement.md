@@ -9,6 +9,18 @@
 > `skill_assignments` table (§3) already exists in Supabase — created by
 > `db/tune.sql` in the frontend repo, RLS on.
 
+> **Downgraded 2026-09-04: orphaned, not just unbuilt.** The frontend was
+> rebuilt from a blank slate that week (`clean_slate_v2`) and the current
+> schema has no `teaching_skills` or `skill_assignments` table, and no
+> `/teaching-skills` route — see
+> [10-remaining-after-keys.md](10-remaining-after-keys.md) §3. Nothing
+> above is stale on its own terms (it was accurate when written, against
+> the pre-rebuild frontend), but this is no longer "next in the queue" —
+> it needs a fresh spec against the rebuilt schema before anyone builds
+> against it, or a product call that the feature isn't coming back yet.
+> Worth keeping for the *shape* of assignment-aware grounding if a v2
+> equivalent gets designed.
+
 Two jobs, one small and one structural:
 
 1. **§1 — the refinement endpoint.** Turn a teacher's interview answers
