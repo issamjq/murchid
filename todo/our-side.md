@@ -85,9 +85,16 @@ holds on our side.
 
 - **Create the recurring Pro prices in Stripe.** Then the backend sets
   `STRIPE_PRICE_PRO_*` in Render and checkout works.
-- **Validate a Brevo sender address.** Without one Brevo answers 201 and
-  silently drops every email — which also blocks student invites being
-  worth building.
+- **Brevo sender — set to `dev.mjq@gmail.com` (2026-09-10).** Two things
+  left: confirm it's actually *validated* in Brevo (an unvalidated
+  sender still gets a silent 201), and before invites reach real
+  students, move to a sender on a domain we control —
+  `invites@murchid.com`, with Brevo's SPF/DKIM records added to the
+  `murchid.com` DNS. Nobody can publish SPF/DKIM for `gmail.com`, so
+  mail from a gmail From address through Brevo fails DMARC alignment and
+  gets spam-foldered or rejected under Google/Yahoo's 2024 bulk-sender
+  rules — Brevo still answers 201, the teacher sees "sent", the student
+  never sees it. Gmail is fine for testing only.
 - **Point a pinger at `/api/keepwarm`**, every ~10 minutes. The route is
   live in this repo (`app/api/keepwarm/route.ts`); cold start measured
   22.6s against 0.16s warm. Nothing to build — cron-job.org or
