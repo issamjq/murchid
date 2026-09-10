@@ -72,16 +72,20 @@ day that column exists.
 
 ## Open items
 
-**Moved.** The live queue is [backend/00-open.md](backend/00-open.md) —
-one page, kept current, and the only thing to hand the backend team.
+**Moved.** Two live queues, both kept current:
+[backend/00-open.md](backend/00-open.md) is the backend team's work and
+the only thing to hand them; [our-side.md](our-side.md) is ours — the
+frontend writes, product decisions and ops chores they are waiting on.
 
 Of the seven items that were listed here, five shipped between 12 Aug
 and 2 Sep: the 429 split, `id` on `done`, cold-start keep-warm (the
 route exists; the pinger is an ops task), extraction, and the whole
 phase 0–5 chain. What remains from this file:
 
-- **`POST /api/studio/skill-profile`** and assignment-aware
-  `skill_ids` — [backend/00-open.md](backend/00-open.md) §3.
+- **`POST /api/studio/skill-profile`** — now live and gated (probed
+  2026-09-10). Assignment-aware `skill_ids` needs a fresh spec against
+  the rebuilt schema; the old one targeted `teaching_skills` /
+  `skill_assignments`, neither of which survived `clean_slate_v2`.
 - **Per-field confidence in `/api/onboarding/parse`** — the funnel wants
   to flag low-confidence auto-filled fields for review; today it only
   gets the `found`/`missing` split. Cosmetic, and the reason it has

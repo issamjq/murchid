@@ -48,7 +48,7 @@ export default function SuperAdminRevenuePage() {
           <EmptyState
             icon={DollarSign}
             title="No subscriptions yet"
-            description="No teacher-facing 'Upgrade to Pro' exists to call checkout yet — see todo/backend/00-open.md §5. Every account is implicitly on the free plan until then."
+            description="No teacher-facing 'Upgrade to Pro' exists to call checkout yet — see todo/our-side.md. Every account is implicitly on the free plan until then."
           />
         ) : (
           <Card>
