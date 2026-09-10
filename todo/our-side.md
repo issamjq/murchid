@@ -4,33 +4,40 @@ Split out of [backend/00-open.md](backend/00-open.md) on 2026-09-10, so
 that file could be the backend team's queue alone. Nothing here is
 waiting on them; most of it is what *they* are waiting on.
 
-## 1. The thing blocking the backend
+## 1. Ratify the tool-calling behaviour we never chose
 
-**The tool-calling provider decision**, and it's the only one left.
-`/api/studio/agent` needs function calling; `streamChat` today sends a
-prompt across a four-provider rotation and reads text back. Adding tools
-raises the question only we can answer: **what happens when a request
-needs tool calling and the rotation lands on a provider that doesn't
-support it** (Groq does, NVIDIA varies, OmniRoute depends on what it
-fronts). Today any provider serves any request; tool calling ends that.
+**`/api/studio/agent` shipped anyway** (probed 2026-09-10: 401, was
+404). It was blocked on a question only we could answer and we never
+answered it, so whatever it does now was decided without us.
 
-Options are roughly: restrict tool-calling requests to capable providers
-only (smaller pool, more queuing), degrade to a no-tools answer on
-incapable ones (inconsistent behaviour, hard to explain to a teacher),
-or fail the request and retry elsewhere. This also blocks chat's
-tool half, so one answer unblocks both.
+The question: **what happens when a request needs tool calling and the
+four-provider rotation lands on a provider that doesn't support it**
+(Groq does, NVIDIA varies, OmniRoute depends on what it fronts).
+Previously any provider served any request; tool calling ends that.
 
-*(The other six routes no longer need shapes from us — see §2.)*
+The three plausible answers, and what each costs:
 
-## 2. Wire the four routes that just shipped
+- **Restrict tool requests to capable providers** — smaller pool, more
+  queuing under load, but behaviour is consistent.
+- **Degrade to a no-tools answer** — always responds, but the same
+  question silently gives a worse answer depending on which provider
+  happened to serve it. This is the one a teacher experiences as a
+  broken product rather than a busy one.
+- **Fail and retry elsewhere** — consistent, costs latency on a miss.
 
-`regenerate`, `quiz-tweak`, `onboarding/parse` and `chat` are **live and
-gated** (probed 2026-09-10), but **nothing in this repo calls any of
-them.** The backend derived their contracts by reading call sites in
-`RewritableBody.jsx`, `QuizBuilder.jsx` and `AssistantWidget.jsx` —
-files from the *pre-rebuild* frontend, which doesn't exist here (this
-repo has no `.jsx` at all). So the shapes are settled against a
-frontend that's gone.
+So this is no longer "send them a decision" — it's **find out which one
+they implemented, then keep it or change it.** The same answer governs
+chat's tool half.
+
+## 2. Wire the five routes that are live and uncalled
+
+`regenerate`, `quiz-tweak`, `onboarding/parse`, `chat` and now `agent`
+are **live and gated** (probed 2026-09-10), but **nothing in this repo
+calls any of them.** The backend derived the first four contracts by
+reading call sites in `RewritableBody.jsx`, `QuizBuilder.jsx` and
+`AssistantWidget.jsx` — files from the *pre-rebuild* frontend, which
+doesn't exist here (this repo has no `.jsx` at all). So the shapes are
+settled against a frontend that's gone.
 
 The contracts look sound, but they're unconfirmed against what we'd
 actually build. Wire each and correct as needed:
@@ -40,7 +47,8 @@ actually build. Wire each and correct as needed:
 | `POST /api/studio/regenerate` | SSE, `{ kind, section, current, prompt }` | Returns the section body only — we re-attach our own `## title` |
 | `POST /api/studio/quiz-tweak` | SSE, `{ quiz: { questions }, instruction }` → `done.quiz` | A truncated/unparseable reply is refused outright rather than partially applied, because our sync is a transactional replace — a short answer would *delete* the omitted questions |
 | `POST /api/onboarding/parse` | JSON, `{ documents: [...] }` → `{ fields, found, missing, unread? }` | Runs before the profile exists, so it carries its own auth gate. Three files max |
-| `POST /api/chat` | SSE, `{ message, scope?, sessionId? }` | Sessions persist across restarts. `onTool`/`onAction` never fire until §1 is answered |
+| `POST /api/chat` | SSE, `{ message, scope?, sessionId? }` | Sessions persist across restarts. `onTool`/`onAction` fire only once §1 is settled |
+| `POST /api/studio/agent` | **Unknown — never specced to us** | Ask for the contract rather than inferring it; it's the one route whose shape wasn't read off our own old code |
 
 **Wire-format rule that decides whether any of these work:** frames must
 carry the discriminator *inside* the payload — `data: {"type":"delta",…}`.
@@ -129,10 +137,11 @@ Working verification queries live in the **backend** repo at
 - **Template library paths:** `/api/studio/library` and
   `/api/studio/library/filters`. Not `/api/library/filters` — that's a
   404, don't wire against it.
-- **Live and gated** (probed): `/api/studio/generate`, `/plan`,
-  `/skill-profile`, `/uploads`, `/regenerate`, `/quiz-tweak`,
-  `/api/curriculum/derive`, `/api/onboarding/parse`, `/api/chat`,
-  `/api/superadmin/keys`, `/api/billing/{checkout,portal,webhook}`.
+- **Live and gated** (probed 2026-09-10): `/api/studio/generate`,
+  `/plan`, `/skill-profile`, `/uploads`, `/regenerate`, `/quiz-tweak`,
+  `/agent`, `/api/curriculum/derive`, `/api/onboarding/parse`,
+  `/api/chat`, `/api/superadmin/keys`,
+  `/api/billing/{checkout,portal,webhook}`. Live ≠ called — see §2.
 - **`unread_materials` is `{id, title}[]` and we already handle it** —
   `unreadMaterialsNotice()` reads `.title` with a count fallback, the
   planner only reads `.length`. No `[object Object]` anywhere. Don't
