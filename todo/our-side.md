@@ -6,14 +6,50 @@ waiting on them; most of it is what *they* are waiting on.
 
 ## 1. The thing blocking the backend
 
-**Request shapes for seven routes** — `/api/chat`,
-`/api/studio/agent`, `quiz-tweak`, `regenerate`,
-`/api/onboarding/parse`, student invites, and a yes/no on
-`/api/corpus/search`. Each is a same-day build once the shape is
-settled, so this is an unanswered question rather than a queue of work.
-Answering it unblocks their entire list.
+**The tool-calling provider decision**, and it's the only one left.
+`/api/studio/agent` needs function calling; `streamChat` today sends a
+prompt across a four-provider rotation and reads text back. Adding tools
+raises the question only we can answer: **what happens when a request
+needs tool calling and the rotation lands on a provider that doesn't
+support it** (Groq does, NVIDIA varies, OmniRoute depends on what it
+fronts). Today any provider serves any request; tool calling ends that.
 
-## 2. Frontend writes
+Options are roughly: restrict tool-calling requests to capable providers
+only (smaller pool, more queuing), degrade to a no-tools answer on
+incapable ones (inconsistent behaviour, hard to explain to a teacher),
+or fail the request and retry elsewhere. This also blocks chat's
+tool half, so one answer unblocks both.
+
+*(The other six routes no longer need shapes from us — see §2.)*
+
+## 2. Wire the four routes that just shipped
+
+`regenerate`, `quiz-tweak`, `onboarding/parse` and `chat` are **live and
+gated** (probed 2026-09-10), but **nothing in this repo calls any of
+them.** The backend derived their contracts by reading call sites in
+`RewritableBody.jsx`, `QuizBuilder.jsx` and `AssistantWidget.jsx` —
+files from the *pre-rebuild* frontend, which doesn't exist here (this
+repo has no `.jsx` at all). So the shapes are settled against a
+frontend that's gone.
+
+The contracts look sound, but they're unconfirmed against what we'd
+actually build. Wire each and correct as needed:
+
+| Route | Contract as built | Notes |
+|---|---|---|
+| `POST /api/studio/regenerate` | SSE, `{ kind, section, current, prompt }` | Returns the section body only — we re-attach our own `## title` |
+| `POST /api/studio/quiz-tweak` | SSE, `{ quiz: { questions }, instruction }` → `done.quiz` | A truncated/unparseable reply is refused outright rather than partially applied, because our sync is a transactional replace — a short answer would *delete* the omitted questions |
+| `POST /api/onboarding/parse` | JSON, `{ documents: [...] }` → `{ fields, found, missing, unread? }` | Runs before the profile exists, so it carries its own auth gate. Three files max |
+| `POST /api/chat` | SSE, `{ message, scope?, sessionId? }` | Sessions persist across restarts. `onTool`/`onAction` never fire until §1 is answered |
+
+**Wire-format rule that decides whether any of these work:** frames must
+carry the discriminator *inside* the payload — `data: {"type":"delta",…}`.
+Our `apiStream.ts` reads only `data:` lines and switches on `type`, so a
+named SSE event streams perfectly and arrives as nothing: the UI spins,
+the request logs 200, and no error appears anywhere. Verified this still
+holds on our side.
+
+## 3. Frontend writes
 
 - **`goals.term_start` / `term_end` are null on all three plans.**
   `src/lib/data/goal-planner.ts` selects both and never writes either —
@@ -23,10 +59,10 @@ Answering it unblocks their entire list.
   table, and the backend doesn't write `goals`.
 - **A teacher-facing billing UI** — "Upgrade to Pro" (calls
   `/api/billing/checkout`) and "Manage billing" (calls `/portal`). Both
-  endpoints are live. Gated on §3 first — there's no point shipping an
+  endpoints are live. Gated on §4 first — there's no point shipping an
   upgrade button while Pro gates nothing.
 
-## 3. Product decisions (owner)
+## 4. Product decisions (owner)
 
 - **Free-tier limits — what Pro actually gets.** Nothing anywhere reads
   `subscriptions.plan`, confirmed on both sides: no frontend behaviour
@@ -45,7 +81,7 @@ Answering it unblocks their entire list.
   retry. That's the better failure — but it's a product call, not a
   migration to slip in.
 
-## 4. Ops chores (owner — account access, not code)
+## 5. Ops chores (owner — account access, not code)
 
 - **Create the recurring Pro prices in Stripe.** Then the backend sets
   `STRIPE_PRICE_PRO_*` in Render and checkout works.
@@ -60,11 +96,11 @@ Answering it unblocks their entire list.
   `src/lib/curriculum.js`. The 12 seeded units carry `source: 'starter'`
   and the UI calls them a draft — honest, but not a ministry sequence.
 
-## 5. Still unexercised end to end
+## 6. Still unexercised end to end
 
 - **Two of three plans are unplaced** — 21 goal items exist, only 7 are
   dated. The placement path works; it has run once.
-- The student invite loop and checkout (§2, §4).
+- The student invite loop and checkout (§3, §5).
 - The weak-spot recap, which needs a class with real question-level
   marks — the test account has one student with none, so a pass today
   would prove nothing.
@@ -87,5 +123,17 @@ Working verification queries live in the **backend** repo at
   `/api/studio/library/filters`. Not `/api/library/filters` — that's a
   404, don't wire against it.
 - **Live and gated** (probed): `/api/studio/generate`, `/plan`,
-  `/skill-profile`, `/uploads`, `/api/curriculum/derive`,
+  `/skill-profile`, `/uploads`, `/regenerate`, `/quiz-tweak`,
+  `/api/curriculum/derive`, `/api/onboarding/parse`, `/api/chat`,
   `/api/superadmin/keys`, `/api/billing/{checkout,portal,webhook}`.
+- **`unread_materials` is `{id, title}[]` and we already handle it** —
+  `unreadMaterialsNotice()` reads `.title` with a count fallback, the
+  planner only reads `.length`. No `[object Object]` anywhere. Don't
+  "fix" this.
+- **Struck/closed by agreement:** `/api/corpus/search` (grounding
+  injects server-side, nothing reads it) and `GET /api/images/:id`
+  (nothing in the rebuilt frontend expects it).
+- **Grounding is verified.** A teacher's upload beat our own corpus copy
+  of the same chapter *and* the service's own quiz template — her "no
+  multiple choice at Grade 9" rule won over a mandated MCQ section, and
+  `grounded_on` named her file correctly.
