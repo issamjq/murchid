@@ -1,38 +1,41 @@
 # Open for the backend team
 
-Four items. Everything else on this list has shipped or been struck —
-re-probed 2026-09-10 against `5c3e575`. Our own work is in
-[../our-side.md](../our-side.md).
+Re-verified 2026-09-10 by probe against the live service.
 
-| # | Item | Blocked on |
+| # | Item | State |
 |---|---|---|
-| 1 | **`POST /api/studio/agent`** — needs tool calling, which today's four-provider rotation doesn't do | **Us.** What happens when a tool-calling request lands on a provider that doesn't support it. Same answer unblocks chat's tool half |
-| 2 | **Student invites** | **Sender set to `dev.mjq@gmail.com`** (2026-09-10). Confirm it's actually *validated* in Brevo, not just entered — an unvalidated sender still gets a silent 201. Fine for testing, but see the note below before invites reach real students |
-| 3 | **Set `STRIPE_PRICE_PRO_MONTHLY` / `_ANNUAL` in Render** | **The owner** creating the recurring prices in Stripe. No code change — `/checkout` correctly answers `503` until then |
-| 4 | **Confirm the `rk_live_…` key mode** | **You**, to answer. It's live money — deliberate, or switch to a test key while the UI is wired? |
+| 1 | **`POST /api/studio/agent`** | ✅ **Built** — now 401 (was 404), control paths still 404. See the note below: we never sent the tool-calling answer it was waiting on, so confirm what it does on a provider that can't do function calling |
+| 2 | **Student invites** | ⏸ **Not built** — no route at any candidate path, no invite table. Correct if still deliberately held on the sender; flagging only so it isn't assumed done |
+| 3 | **`STRIPE_PRICE_PRO_MONTHLY` / `_ANNUAL` in Render** | ❓ **Unverified** — can't be checked from outside (see below) |
+| 4 | **Confirm the `rk_live_…` key mode** | ❓ **Unanswered** — still live money |
 
-Nothing else is waiting on you. Expect small contract corrections on
-`regenerate`, `quiz-tweak`, `onboarding/parse` and `chat` when we wire
-them — their shapes were read off the pre-rebuild frontend, which this
-repo no longer has.
+## Why 3 and 4 can't be verified by probe
 
-## On the invite sender
+`/api/billing/checkout` and `/portal` are correctly auth-gated (401
+without a token) and the service exposes no configuration anywhere —
+`/` and `/healthz` return service name and uptime only, which is right.
 
-`dev.mjq@gmail.com` will validate and send, but it swaps one silent
-failure for another once real students are on the receiving end.
+So telling `503 price_not_configured` from a working checkout needs an
+**authenticated** call. On an `rk_live_…` key that creates a real Stripe
+Checkout Session against live payment infrastructure. Not doing that
+without a deliberate go-ahead, especially while item 4 is the open
+question. Either:
 
-Nobody can publish SPF or DKIM records for `gmail.com` — we don't own
-the domain — so mail sent through Brevo authenticates *Brevo's* domain
-while the From address says `gmail.com`. That's a DMARC alignment
-failure, and since Google and Yahoo's 2024 bulk-sender rules, unaligned
-mail from a `gmail.com` From address routinely lands in spam or is
-rejected outright. Brevo still answers 201. The teacher sees an invite
-sent; the student never sees it.
+- confirm in the Stripe dashboard that the two recurring prices exist
+  and their ids match what's set in Render, or
+- say the word and we'll run one authenticated checkout against a test
+  key once item 4 is settled.
 
-**For production, send from a domain we control** — `murchid.com`, with
-Brevo domain authentication (its SPF/DKIM records added to the
-`murchid.com` DNS): `invites@murchid.com` or `noreply@murchid.com`.
-That's the setup that actually reaches an inbox.
+## On the agent route shipping
 
-Keep `dev.mjq@gmail.com` for testing if it's useful — just don't let
-the invite loop ship on it.
+Its blocker was a question we owed you: what happens when a request
+needs tool calling and the four-provider rotation lands on a provider
+that doesn't support it (Groq does, NVIDIA varies, OmniRoute depends on
+what it fronts). We never sent an answer, so whatever it does now is a
+choice made without us.
+
+Not a complaint if it's a reasonable default — just tell us which:
+restrict tool requests to capable providers, degrade to a no-tools
+answer, or fail and retry elsewhere. A teacher hitting the third
+behaviour unknowingly is the one that reads as a broken product rather
+than a busy one. Same answer still governs chat's tool half.
