@@ -1,168 +1,180 @@
 # What is still open
 
-> **Consolidated 2026-09-10** from six files (`00-open.md`,
-> `08-skills-refinement.md`, `09-schema-mismatch-blocks-everything.md`,
-> `10-remaining-after-keys.md`, `11-generation-pipeline-spec.md`,
-> `12-billing-spec.md`) into this one. Resolved items and historical
-> diagnosis were dropped; this is the pending list only. If it's not
-> here, it's not waiting on anyone.
+> **Re-checked 2026-09-10**, after the backend replied that eight items on
+> this list had already been closed. Most of that reply verified — the
+> details are in "Closed since the last list" at the bottom, kept short so
+> nobody re-opens them. Two corrections to the reply are folded in below.
 >
-> The short version of where things stand: `final/backend` — the branch
-> actually deployed — is a deliberate scaffold (boot, auth, health, the
-> key pool, and now the core generation endpoint). It reads the rebuilt
-> frontend's schema (`profiles`/`classes`/`batches`/`grades`/`divisions`/
-> `materials`/`goal_items`/`assessments`), not the old one
-> (`faculty`/`ai_studio`/`teaching_skills`/…). `backendv2`/`main` have a
-> lot more built against that old schema, but none of it is deployed or
-> reconnected.
+> **How to read a route probe.** `/api/*` returns
+> `404 {"code":"not_found"}` for an unmatched path — *except* under
+> `/api/studio/*` and `/api/curriculum/*`, where auth still runs before
+> routing, so a path that doesn't exist answers `401 unauthorized`
+> instead. Verified: `/api/studio/totally-fake-xyz` → 401. So a 401 under
+> those two prefixes proves nothing about whether the route exists, and
+> only an authenticated caller can tell. See §6 — this is a real bug, not
+> just a testing inconvenience.
 
-## 1. Scoping decision needed before picking up anything below
+## 1. Scoping decision needed before picking up anything in §2
 
-For each route in §2: reconnect the old logic against the new schema,
-rebuild from scratch against it, or some mix. `backendv2` and `main` are
-both intact and readable on GitHub if reusing logic is worth it —
-nothing there was deleted, it just isn't live.
+For each route: reconnect the old logic against the new schema, rebuild
+from scratch against it, or some mix. `backendv2` and `main` are both
+intact and readable on GitHub if reusing logic is worth it. The backend
+has said each of these is small once the request shape is settled — send
+a shape and it can be built the same day — so this decision, not the
+work, is the blocker.
 
-## 2. Not reachable at all right now (404 on `final/backend`)
+## 2. Still missing
 
-| Feature | Old route(s) | Notes |
-|---|---|---|
-| Studio conversation agent | `POST /api/studio/agent` | "Make the AI Studio a conversation rather than a pipeline" |
-| Chat assistant | `POST /api/chat` | Separate from the studio routes |
-| Onboarding document parsing | `POST /api/onboarding/parse` | CV/document → structured profile fields |
-| Curriculum derive | `POST /api/curriculum/derive` | Syllabus upload → term structure. Logic was verified against a real CBSE syllabus on `backendv2`; the HTTP route itself was never exercised end-to-end even there |
-| Corpus / grounding | `POST /api/corpus/search` + injection into generation | Ingest + search shipped and were verified (scope wall, tenant isolation) on `backendv2`; injecting retrieved passages into prompts was never finished even there. See §5 |
-| Materials extraction (OCR/text) | `POST /api/materials/:id/extract`, `POST /api/materials/extract-pending` | Must be an authenticated per-teacher call (25 files a batch), not a cron job — the service holds no service-role key on purpose, so a sweep of everyone's backlog isn't something a scheduled job can safely do. This is what the current frontend's "paste the extracted text yourself" honesty notice (Notes tab, shared library) stands in for |
-| Template library + moderation | `/api/library/*` | See `docs/templates.md` on the backend repo |
-| Student invites | Brevo-based invite email | Class-named invite links |
-| Skill-profile refinement | `POST /api/studio/skill-profile` | Orphaned, not just unbuilt — see §3 |
-| `quiz-tweak`, `regenerate` | `POST /api/studio/{quiz-tweak,regenerate}` | Not yet rebuilt alongside `generate` (§4) |
-| Images compatibility tail | `GET /api/images/:id` | Marked "compatibility tail only" even on `backendv2` |
+Confirmed `404 not_found` on an unauthenticated probe, which is
+conclusive for these (they sit outside the two auth-masked prefixes):
 
-## 3. Skills refinement — orphaned, needs a fresh spec
+| Route | Notes |
+|---|---|
+| `POST /api/chat` | Chat assistant, separate from the studio routes |
+| `POST /api/onboarding/parse` | CV/document → structured profile fields |
+| `POST /api/corpus/search` | Confirmed absent — but grounding no longer needs it (§"Closed"), so this may not need building at all. Decide before speccing |
+| Student invites | Brevo-based, class-named invite links |
+| `GET /api/images/:id` | "Compatibility tail only" even on `backendv2` |
 
-`08-skills-refinement.md` targeted `/teaching-skills`, a `teaching_skills`
-table, and a `skill_assignments` table keyed on `faculty_id` — none of
-which exist in the rebuilt frontend (dropped in the `clean_slate_v2`
-rewrite). Not "next in the queue" — it needs a new spec against the
-current schema, or a product call that the feature isn't coming back
-yet. Worth reading the old spec for the *shape* of assignment-aware
-grounding (a skill applies where grade/section/subject match, or
-globally if unassigned) if a v2 equivalent gets designed.
+Reported by the backend as 404 for an *authenticated* caller. Not
+independently verifiable from outside, because they sit under the
+auth-masked `/api/studio/*` prefix:
 
-## 4. Generation — built; what's still missing around it
+| Route | Notes |
+|---|---|
+| `POST /api/studio/agent` | The conversational studio surface |
+| `POST /api/studio/quiz-tweak`, `POST /api/studio/regenerate` | Not rebuilt alongside `generate` |
 
-`POST /api/studio/generate` is live and wired into all 7 class tabs.
-Still open:
+## 3. Data the pipeline doesn't write
 
-- **Grounded generation.** The corpus and `/api/corpus/search` exist;
-  injecting retrieved passages into lesson/quiz prompts does not. When
-  built: prefer the teacher's material over generic knowledge where both
-  match, say in the output which source a section drew on, and generate
-  as today rather than forcing in weak passages when retrieval finds
-  nothing useful.
-- **`estimateCredits()`'s rule for a multi-document lesson.** The
-  composer quoted ~6 credits, the real spend was 9 (a lesson plan +
-  student notes, +5 and +4) — it's evidently metered per document, not
-  per selected kind. Get the real formula rather than guessing a
-  multiplier.
-- **The privacy policy line.** Has to say class-level performance now
-  shapes generated material — current wording ("what is not sent: …
-  marks or submissions") stops being true once the weak-spot prompt
-  ships. Written and sitting on branch `privacy-performance-line`,
-  waiting on the owner (visitor-facing legal text) — only actually
-  relevant once grounded generation ships.
-- **An SSE heartbeat** on any streaming route (a `:` frame at least every
-  ~90s) — its absence previously meant a slow-thinking model on a long
-  turn got killed by the frontend's own 90s idle timeout. Worth
-  confirming this is designed in before any route above starts
-  streaming, since it bit the old backend for real.
+Both verified against the live database today, both small, both make a
+row unable to answer a question it should be able to answer:
 
-## 5. Billing — built; blocked on ops, then frontend
+- **`goals.term_start` / `term_end` are null on every plan** (0 of 3,
+  including the placed one). `src/lib/data/goal-planner.ts` selects both
+  and never writes either — the schedule response carries the window and
+  the browser writes the item dates but not the goal's own. So a plan
+  row can't say what term it covers.
+- **Nothing reads `subscriptions.plan`** except `/super-admin/revenue`,
+  which only counts paying accounts. No teacher-facing behaviour changes
+  with it, so **Pro currently buys nothing.** Worth settling what the
+  free tier actually caps before an upgrade button ships (§5) — selling
+  a plan that gates nothing is the worse failure.
 
-`POST /api/billing/{checkout,portal,webhook}` are live exactly per spec.
-Blocked only on:
+## 4. Product decisions needed before code
 
-- **Stripe dashboard task, not code.** No recurring Murchid prices exist
-  yet (`STRIPE_PRICE_PRO_MONTHLY`/`STRIPE_PRICE_PRO_ANNUAL` unset in
-  Render) — `/checkout` answers `503 price_not_configured` until they
-  are. Also worth confirming before real money moves: the server key is
-  `rk_live_…` (live mode) — intentional, or switch to test while wiring
-  the frontend UI first.
-- **No teacher-facing billing UI yet.** "Upgrade to Pro" (calls
-  `/checkout`) and "Manage billing" (calls `/portal`) — frontend work
-  that follows once prices exist to test checkout against. Today only
-  `/super-admin/revenue` reads `subscriptions`, honestly labelled
-  "checkout isn't wired up yet."
-- **Product decisions not yet made:** trial policy for Pro (length, if
-  any), free-tier limits (what caps to make Pro worth paying for —
-  the frontend reads whatever it is off `subscriptions.plan` once it
-  exists), proration/downgrade behaviour (Stripe's own portal default
-  is probably fine, only worth custom-building if it isn't).
+- **Free-tier limits.** What Pro is actually for — see §3. The frontend
+  reads it off `subscriptions.plan` once decided.
+- **Trial policy** for Pro (length, if any), and proration/downgrade
+  behaviour (Stripe's portal default is probably fine; only worth
+  custom-building if it isn't).
+- **Single-device session enforcement.** Removed in the auth rebuild
+  because `active_session_id` didn't exist on the new schema. If it
+  still matters: design the column + RLS predicate first, then add the
+  backend check — enforcing it only in the backend while the browser
+  writes Supabase directly would be theatre.
+- **A unique index on `(goal_id, kind)`.** Deliberately *not* added.
+  There are no duplicate items anywhere today, but the retry path
+  re-drafts only the kinds that failed, so a unique index would convert
+  a duplicate into a failed retry. That is the better failure, but it's
+  a product call, not a migration to slip in.
 
-## 6. Other product decisions needed before code
+## 5. Billing — built, blocked on ops, then frontend
 
-- **Single-device session enforcement.** Removed in the auth fix because
-  `active_session_id` doesn't exist on the new schema, and enforcing it
-  only in the backend while the browser's own direct Supabase writes go
-  unchecked would be theatre. If this still matters: design the column +
-  RLS predicate on the new schema first, then add the backend check.
+`POST /api/billing/{checkout,portal,webhook}` are live. Blocked on:
 
-## 7. Config/providers to re-add, not decisions
+- **A Stripe dashboard task.** No recurring Murchid prices exist yet, so
+  `STRIPE_PRICE_PRO_MONTHLY`/`STRIPE_PRICE_PRO_ANNUAL` are unset in
+  Render and `/checkout` answers `503 price_not_configured`.
+- **A key-mode confirmation.** The server key is `rk_live_…` — live
+  mode. Confirm that's intentional, or switch to a test key while the
+  frontend UI is wired.
+- **No teacher-facing billing UI.** "Upgrade to Pro" and "Manage
+  billing" are frontend work, gated on prices existing to test against —
+  and on §3/§4 deciding what Pro does.
 
-`final/backend`'s reset dropped these along with the code that read
-them — re-adding is part of rebuilding whichever route needs them:
+## 6. The 404-carries-a-code fix is only half applied
 
-- **No AI provider is configured** except OpenRouter (the key pool).
-  Gemini, Anthropic and Stripe (config side) are gone from the env
-  schema and `package.json`. Whichever route in §2 gets rebuilt first
-  picks its own provider.
-- **`EMBEDDING_API_KEY`/`GEMINI_EMBED_MODEL`** no longer exist in
-  `config/env.ts`. Setting them in Render does nothing until retrieval
-  (§2, corpus/grounding) is rebuilt and reads them again.
+Unmatched `/api/*` paths correctly return `404 {"code":"not_found"}`,
+**but not under `/api/studio/*` or `/api/curriculum/*`** — auth runs
+before routing there, so a nonexistent path returns `401 unauthorized`.
+Verified today against the live service with a made-up path under each
+prefix.
 
-## 8. Ops tasks, not code
+This is the exact failure the original fix was for. The frontend's
+`no_backend` handling keys off a 404 carrying a `code`; a 401 from a
+route that simply isn't deployed will instead read as a session problem,
+and the teacher gets told to sign in again for a feature that was never
+built. Mount auth *after* routing on those two prefixes, or 404 unknown
+sub-paths before the auth gate.
+
+## 7. Ops tasks, not code
 
 - **A Brevo-validated sender address.** Without one, Brevo answers 201
-  and silently drops every email. (Supabase's own "Confirm email" is
-  off — that half is done.)
-- **A scheduled pinger on `/api/keepwarm`**, every ~10 minutes. The route
-  is restored and live (`app/api/keepwarm/route.ts`, in this repo, not
-  the backend's) — a cold first request measured 22.6s, the next 0.16s.
-  Nothing left to build, only an external pinger (cron-job.org,
-  UptimeRobot) to point at `https://www.murchid.com/api/keepwarm`.
-- **A `render.yaml` that describes the service actually serving
-  traffic.** The blueprint still describes `main`/starter/Singapore; the
-  deployed service is Free/Oregon under a third host name
-  (`murchid-backend-no24`). Drift here has already cost one failed
-  deploy.
+  and silently drops every email.
+- **A scheduled pinger on `/api/keepwarm`**, every ~10 minutes. The
+  route is live in *this* repo (`app/api/keepwarm/route.ts`); a cold
+  first request measured 22.6s against 0.16s warm. Nothing to build,
+  only an external pinger (cron-job.org, UptimeRobot) pointed at
+  `https://www.murchid.com/api/keepwarm`.
 - **A curriculum specialist** to verify and extend
   `src/lib/curriculum.js`. The 12 seeded units carry `source: 'starter'`
-  and the UI says they're a draft — honest, but not a ministry sequence,
-  and shouldn't be shown as one.
+  and the UI calls them a draft — honest, but not a ministry sequence.
 
-## 9. Still unexercised end-to-end, once reachable
+## 8. Verifying a real run
 
-One real lesson has generated successfully in production (streamed a
-plan + student notes, one row, correct title, no cut stream). Not yet
-exercised by a real teacher session:
+The two queries this file used to carry targeted `ai_studio` and
+`goal_days`, **both of which no longer exist** — confirmed today, so
+they error rather than answer. Working equivalents live in the backend
+repo at `db/verification-queries.sql` (not this one — don't go looking
+in `db/` here). What they check: weekend placement, teaching order,
+duplicate items per plan, and whether a plan's quiz and exam became
+linked `assessments` rows.
 
-- The term-plan placement path (`goal_days` still empty — nobody has
-  pressed *Put N lessons on my timetable* for real).
-- Grounded generation (§4).
-- The student invite loop and checkout (§5).
-- The weak-spot recap (needs a class with real question-level marks
-  behind it; the test account currently has one student with none, so a
-  pass today would prove nothing).
+Still unexercised end to end:
 
-Two queries settle most of what's left once there's something to check:
+- **Two of three plans are still unplaced** — 21 goal items exist, only
+  7 are dated. The placement path works (below); it has run once.
+- Grounded generation has shipped but hasn't been checked against a
+  teacher's own uploaded material outranking ours in a real lesson.
+- The student invite loop and checkout (§2, §5).
+- The weak-spot recap, which needs a class with real question-level
+  marks behind it — the test account has one student with none, so a
+  pass today would prove nothing.
 
-```sql
--- A lesson should be exactly one row per type
-select type, count(*) from public.ai_studio
- where batch_id = '<batch_id>' group by type;
+## Closed since the last list
 
--- A placed term should have dated days with real outcomes
-select count(*) days, count(date) dated, count(nullif(outcomes,'{}')) with_outcomes
-  from public.goal_days where goal_id = '<goal_id>';
-```
+Verified by me against the live database, not taken on report:
+
+- **The credits formula.** Metered **per document, priced from
+  `feature_costs`, charged only after each document succeeds** — a plan
+  whose exam fails is charged for six. Confirmed exactly: three plans,
+  7 ledger rows each, 9 credits each; `feature_costs` reads exam 2,
+  slide_deck 2, and 1 each for lesson_plan, note, activity, homework,
+  quiz. The old "composer quoted ~6, spend was 9" mystery is closed.
+  The backend also reports `/api/studio/generate` writes nothing to the
+  ledger, so a single generation quotes zero — consistent with the rows
+  (every one of the 108 fits a seven-document plan run), though not
+  independently provable from the ledger alone.
+- **Term-plan placement has happened for real.** Seven items dated
+  Sep 14 → Dec 11, **zero on a weekend**, all seven `scheduled`,
+  teaching order intact with the exam last.
+- **`assessments.goal_item_id` is filled** — 2 of 2 rows linked. That
+  foreign key had existed since the table was created and had never
+  once been populated.
+
+Reported by the backend, believed but not independently verifiable from
+outside (all sit under the auth-masked prefixes — see the note at the
+top): `/api/curriculum/derive` live and run against a real CBSE
+syllabus; `/api/studio/skill-profile` live with both request shapes;
+template library and materials extraction live; grounded generation
+built, with `matchCorpus` injecting into both `/generate` and the
+planner and the answer naming its sources in `grounded_on`; an SSE
+heartbeat every 15s; four AI providers and 12 keys configured;
+`render.yaml` corrected to free/Oregon with 23 missing env vars added.
+
+**One correction.** The reply listed the template library as live at
+`/library/filters`; that path is a confirmed 404. `/api/studio/library`
+and `/api/studio/library/filters` both sit behind the auth gate and are
+the likely real paths — worth pinning down exactly before the frontend
+wires against them.
