@@ -74,6 +74,33 @@ holds on our side.
 
 ## 4. Product decisions (owner)
 
+- **The two allowance numbers — Free and Pro.** Blocks
+  `/api/billing/plans` and all enforcement. The backend's interim
+  suggestion is Free ≈ 20, Pro ≈ 300–500, against a measured worst
+  legitimate month of ~70 for a teacher with 5 classes of 30. Both live
+  in a table, so a first guess is cheap to correct — worth not
+  agonising over. **Caveat: don't size these off the ledger yet** — it
+  currently records `chat` and `studio_agent` at zero, and chat is the
+  largest token consumer there is.
+- **Price `chat` and `studio_agent`** — see the backend doc. They're
+  metering at 0 today.
+- **Reprice `slide_deck` and `exam`?** Measured against real token use,
+  `slide_deck` costs about what an activity does but is charged double,
+  and `exam` is the most expensive thing in the product (≈5× a lesson
+  plan) but charged the same 2 as a deck. The backend's suggestion is
+  `slide_deck` → 1, `exam` → 4, and deliberately hasn't changed them
+  because it changes what teachers are charged. One `UPDATE` each.
+- **Confirm the `rk_live_…` Stripe key is the intended account — before
+  creating the prices, not after.** The two missing price IDs are the
+  only thing standing between a live key and a real card charge; a
+  checkout probe returns `503 price_not_configured` rather than a
+  wrong-mode error, which confirms the live key is fully active and its
+  guard inert in production. Create the prices first and that margin
+  disappears the moment the IDs land in Render — no deploy, no warning.
+- **Keep two plans, not three.** Schema and code both allow only
+  `free`/`pro`. Adding a tier later is a constraint change; removing one
+  people have bought is not.
+
 - **Free-tier limits — what Pro actually gets.** Nothing anywhere reads
   `subscriptions.plan`, confirmed on both sides: no frontend behaviour
   changes with it and no backend route consults it, so **Pro currently
@@ -133,10 +160,22 @@ Working verification queries live in the **backend** repo at
 
 - **The credits formula.** Metered per document, priced from
   `feature_costs`, charged only after each document succeeds — a plan
-  whose exam fails is charged for six. Three plans, 7 ledger rows and 9
-  credits each; exam 2, slide_deck 2, 1 each for the other five.
-  `/api/studio/generate` writes **nothing**, to the ledger or any table,
-  so a single generation quotes zero.
+  whose exam fails is charged for six. Prices: exam 2, slide_deck 2, 1
+  each for lesson_plan/note/activity/homework/quiz, 0.2 for
+  report_comment/parent_update.
+
+  **Correction (2026-09-11):** we previously recorded "`/generate`
+  writes nothing, so a single generation quotes zero" as settled
+  behaviour. It wasn't — it was a bug. That route never imported the
+  credits module and metered nothing at all, which went unnoticed
+  precisely because the planner and notes paths *did* meter, so the
+  ledger looked healthy while blind to the busiest path in the app.
+  Fixed and verified: the ledger grew 108 → 135 rows once generate
+  started recording. Two more of the same class were fixed alongside it
+  (a CHECK constraint that made the two per-student features unpriceable,
+  and an integer `credits` column that silently swallowed fractional
+  prices). Worth remembering as a reminder that "no rows" is evidence of
+  nothing being *recorded*, not of nothing *happening*.
 - **The tool-calling question is answered** — and well. All five
   providers were tested with live calls: groq, google, openrouter and
   nvidia do function calling, omniroute doesn't. The rotation now
@@ -153,7 +192,10 @@ Working verification queries live in the **backend** repo at
   `POST /api/corpus/search`.
 - **Term-plan placement works** — seven items dated Sep 14 → Dec 11,
   zero on a weekend, teaching order intact with the exam last, and
-  `assessments.goal_item_id` filled for both assessments.
+  `assessments.goal_item_id` filled for both assessments. *Verified
+  2026-09-10; that test data has since been deleted (all goals and
+  goal_items are gone), so it can't be re-derived without placing a new
+  plan.*
 - **Template library paths:** `/api/studio/library` and
   `/api/studio/library/filters`. Not `/api/library/filters` — that's a
   404, don't wire against it.
